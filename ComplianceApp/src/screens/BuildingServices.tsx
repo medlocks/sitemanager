@@ -1,160 +1,123 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, TextStyle, ViewStyle } from 'react-native';
-import { ServiceReport } from '../types';
+import { 
+  View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ActivityIndicator 
+} from 'react-native';
+import { buildingService } from '../services/buildingService';
+import { assetService } from '../services/assetService';
+import { useAuth } from '../context/AuthContext';
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '../theme';
 
-const REGULATORY_SERVICES: ServiceReport[] = [
-  { id: 'S1', type: 'TR19_DUCTWORK', assetName: 'Kitchen Extract System', regulation: 'BS EN 15780 / TR19', lastServiceDate: '2025-11-10', nextServiceDueDate: '2026-05-10', status: 'Compliant' },
-  { id: 'S2', type: 'GAS_SAFETY', assetName: 'Main Boiler House', regulation: 'Gas Safety (Installation and Use) Regs', lastServiceDate: '2025-01-15', nextServiceDueDate: '2026-01-15', status: 'Urgent Action' },
-  { id: 'S3', type: 'HVAC', assetName: 'Server Room F-Gas', regulation: 'F-Gas Regulation (EU) 517/2014', lastServiceDate: '2025-06-01', nextServiceDueDate: '2026-06-01', status: 'Compliant' },
-  { id: 'S4', type: 'FIRE_SAFETY', assetName: 'Sprinkler System', regulation: 'BS 9251:2021', lastServiceDate: '2025-12-20', nextServiceDueDate: '2026-12-20', status: 'Compliant' },
-  { id: 'S5', type: 'TR19_DUCTWORK', assetName: 'AHU Supply Ducting', regulation: 'BS EN 15780 Hygiene Class B', lastServiceDate: '2024-01-01', nextServiceDueDate: '2025-01-01', status: 'Overdue' }
-];
+export const BuildingServices = ({ navigation }: any) => {
+  const { user } = useAuth();
+  const [services, setServices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-export const BuildingServices = () => {
-  const [services] = useState<ServiceReport[]>(REGULATORY_SERVICES);
+  const loadBuildingData = async () => {
+    try {
+      setLoading(true);
+      const data = await buildingService.getServiceReports();
+      setServices(data);
+    } catch (error: any) {
+      Alert.alert("Sync Error", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const overdue = services.filter(s => s.status !== 'Compliant').length;
-    if (overdue > 0) {
-      Alert.alert(
-        "Legal Risk Alert", 
-        `You have ${overdue} services failing BS EN 15780 or Gas Safety standards. High risk of non-compliance fines.`
-      );
-    }
-  }, [services]);
+    navigation.setOptions({
+      headerRight: () => (
+        user?.role === 'Manager' && (
+          <TouchableOpacity onPress={() => navigation.navigate('AddAsset')} style={styles.navAddBtn}>
+            <Text style={styles.navAddText}>+ NEW</Text>
+          </TouchableOpacity>
+        )
+      ),
+    });
+    const unsubscribe = navigation.addListener('focus', loadBuildingData);
+    return unsubscribe;
+  }, [navigation, user]);
 
-  const renderService = ({ item }: { item: ServiceReport }) => {
+  const handleDuplicate = async (item: any) => {
+    try {
+      setLoading(true);
+      await assetService.duplicateAsset(item);
+      await loadBuildingData();
+    } catch (e: any) {
+      Alert.alert("Error", e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderService = ({ item }: { item: any }) => {
     const isCompliant = item.status === 'Compliant';
+    const isManager = user?.role === 'Manager';
 
     return (
-      <View style={[
-        styles.card, 
-        isCompliant ? { borderColor: COLORS.success } : { borderColor: COLORS.secondary }
-      ]}>
+      <TouchableOpacity 
+        style={[styles.card, { borderLeftColor: isCompliant ? COLORS.success : COLORS.secondary }]}
+        onPress={() => isManager && navigation.navigate('AddAsset', { asset: item })}
+      >
         <View style={styles.headerRow}>
-          <Text style={styles.typeTag}>{item.type.replace('_', ' ')}</Text>
-          <View style={[
-            styles.statusBadge, 
-            { backgroundColor: isCompliant ? COLORS.success : COLORS.secondary }
-          ]}>
+          <Text style={styles.typeTag}>{item.type}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: isCompliant ? COLORS.success : COLORS.secondary }]}>
             <Text style={styles.badgeText}>{item.status}</Text>
           </View>
         </View>
-        
         <Text style={styles.assetTitle}>{item.assetName}</Text>
-        <Text style={styles.regText}>Regulation: {item.regulation}</Text>
+        <Text style={styles.meta}>📍 {item.location || 'No location'}</Text>
         
         <View style={styles.dateGrid}>
-          <View>
-            <Text style={styles.dateLabel}>Last Inspected</Text>
-            <Text style={styles.dateValue}>{item.lastServiceDate}</Text>
-          </View>
-          <View>
-            <Text style={styles.dateLabel}>Next Due</Text>
-            <Text style={[
-              styles.dateValue, 
-              !isCompliant && { color: COLORS.secondary }
-            ]}>
-              {item.nextServiceDueDate}
-            </Text>
-          </View>
+          <View><Text style={styles.dateLabel}>LAST</Text><Text style={styles.dateValue}>{item.lastServiceDate || '-'}</Text></View>
+          <View><Text style={styles.dateLabel}>DUE</Text><Text style={styles.dateValue}>{item.nextServiceDueDate}</Text></View>
         </View>
 
-        <TouchableOpacity style={styles.actionBtn}>
-          <Text style={styles.btnText}>View Certificate & Cleaning Records</Text>
-        </TouchableOpacity>
-      </View>
+        {isManager && (
+          <View style={styles.actionRow}>
+            <TouchableOpacity 
+              style={styles.assignBtn}
+              onPress={() => navigation.navigate('ContractorAssignment', { incidentId: item.id, isAsset: true, assetName: item.assetName })}
+            >
+              <Text style={styles.btnText}>ASSIGN</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.copyBtn} onPress={() => handleDuplicate(item)}>
+              <Text style={styles.copyText}>COPY</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </TouchableOpacity>
     );
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.mainTitle}>Statutory Building Compliance</Text>
-      <FlatList 
-        data={services}
-        keyExtractor={(item) => item.id}
-        renderItem={renderService}
-        contentContainerStyle={{ paddingBottom: SPACING.l }}
-      />
+      <Text style={styles.mainTitle}>Asset Register</Text>
+      {loading ? <ActivityIndicator size="large" color={COLORS.primary} /> : (
+        <FlatList data={services} keyExtractor={(item) => item.id} renderItem={renderService} />
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    padding: SPACING.m, 
-    backgroundColor: COLORS.background 
-  } as ViewStyle,
-  mainTitle: { 
-    ...TYPOGRAPHY.header,
-    marginBottom: SPACING.l, 
-    textTransform: 'uppercase' 
-  } as TextStyle,
-  card: { 
-    backgroundColor: COLORS.white, 
-    borderRadius: 12, 
-    padding: SPACING.m, 
-    marginBottom: SPACING.m, 
-    borderWidth: 1.5,
-    ...SHADOWS.light 
-  } as ViewStyle,
-  headerRow: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    marginBottom: SPACING.s 
-  } as ViewStyle,
-  typeTag: { 
-    fontSize: 12, 
-    fontWeight: 'bold', 
-    color: COLORS.primary 
-  } as TextStyle,
-  statusBadge: { 
-    paddingHorizontal: SPACING.s, 
-    paddingVertical: 4, 
-    borderRadius: 6 
-  } as ViewStyle,
-  badgeText: { 
-    color: COLORS.white, 
-    fontSize: 10, 
-    fontWeight: 'bold' 
-  } as TextStyle,
-  assetTitle: { 
-    ...TYPOGRAPHY.subheader,
-    color: COLORS.text 
-  } as TextStyle,
-  regText: { 
-    ...TYPOGRAPHY.caption,
-    fontStyle: 'italic', 
-    marginTop: 4 
-  } as TextStyle,
-  dateGrid: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    marginTop: SPACING.m, 
-    borderTopWidth: 1, 
-    borderTopColor: COLORS.lightGray, 
-    paddingTop: SPACING.s 
-  } as ViewStyle,
-  dateLabel: { 
-    ...TYPOGRAPHY.caption 
-  } as TextStyle,
-  dateValue: { 
-    fontSize: 13, 
-    fontWeight: '600',
-    color: COLORS.text 
-  } as TextStyle,
-  actionBtn: { 
-    backgroundColor: COLORS.primary, 
-    padding: SPACING.s, 
-    borderRadius: 8, 
-    marginTop: SPACING.m, 
-    alignItems: 'center' 
-  } as ViewStyle,
-  btnText: { 
-    color: COLORS.white, 
-    fontWeight: 'bold', 
-    fontSize: 12 
-  } as TextStyle
+  container: { flex: 1, padding: SPACING.m, backgroundColor: COLORS.background },
+  mainTitle: { ...TYPOGRAPHY.header, marginBottom: 15 },
+  card: { backgroundColor: COLORS.white, padding: 15, borderRadius: 10, marginBottom: 12, borderLeftWidth: 6, ...SHADOWS.light },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  typeTag: { fontSize: 10, fontWeight: 'bold', color: COLORS.primary },
+  statusBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  badgeText: { color: COLORS.white, fontSize: 10, fontWeight: 'bold' },
+  assetTitle: { fontSize: 16, fontWeight: 'bold', marginTop: 5 },
+  meta: { fontSize: 12, color: COLORS.gray },
+  dateGrid: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#eee' },
+  dateLabel: { fontSize: 8, color: COLORS.gray },
+  dateValue: { fontSize: 12, fontWeight: 'bold' },
+  actionRow: { flexDirection: 'row', marginTop: 15, justifyContent: 'space-between' },
+  assignBtn: { backgroundColor: COLORS.primary, flex: 0.75, padding: 10, borderRadius: 6, alignItems: 'center' },
+  copyBtn: { backgroundColor: '#eee', flex: 0.2, padding: 10, borderRadius: 6, alignItems: 'center' },
+  btnText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
+  copyText: { fontWeight: 'bold', fontSize: 12 },
+  navAddBtn: { backgroundColor: COLORS.success, padding: 8, borderRadius: 6 },
+  navAddText: { color: '#fff', fontWeight: 'bold' }
 });

@@ -1,177 +1,117 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  FlatList, 
-  StyleSheet, 
-  TextStyle, 
-  ViewStyle 
-} from 'react-native';
-import { Contractor } from '../types';
-import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '../theme';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, SafeAreaView, SectionList, Alert } from 'react-native';
+import { contractorService, Contractor } from '../services/contractorService';
+import { COLORS, TYPOGRAPHY, SHADOWS } from '../theme';
 
-const MOCK_CONTRACTORS: Contractor[] = [
-  {
-    id: 'C001',
-    name: 'James Smith',
-    company: 'BuildSafe Ltd',
-    specialism: 'GENERAL',
-    qualifications: [
-      { id: 'Q1', type: 'Working at Height', expiryDate: '2026-12-01', isValid: true },
-      { id: 'Q2', type: 'CSCS Card', expiryDate: '2027-05-15', isValid: true }
-    ]
-  },
-  {
-    id: 'C002',
-    name: 'Sarah Jones',
-    company: 'Electra-Fix',
-    specialism: 'ELECTRICAL',
-    qualifications: [
-      { id: 'Q3', type: 'High Voltage Specialist', expiryDate: '2025-01-01', isValid: false }
-    ]
-  },
-  {
-    id: 'C003',
-    name: 'Sarah Vent',
-    company: 'Air-Flow Hygiene',
-    specialism: 'TR19_DUCTWORK',
-    qualifications: [
-      { id: 'Q4', type: 'TR19 Certified', expiryDate: '2026-05-01', isValid: true }
-    ]
-  }
-];
+export const QualificationTracker = ({ navigation }: any) => {
+  const [allContractors, setAllContractors] = useState<Contractor[]>([]);
+  const [filteredSections, setFilteredSections] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
 
-export const QualificationTracker = () => {
-  const [search, setSearch] = useState('');
-  const [results, setResults] = useState(MOCK_CONTRACTORS);
-
-  const handleSearch = (text: string) => {
-    setSearch(text);
-    const filtered = MOCK_CONTRACTORS.filter(c => 
-      c.name.toLowerCase().includes(text.toLowerCase()) || 
-      c.company.toLowerCase().includes(text.toLowerCase()) ||
-      c.specialism.toLowerCase().includes(text.toLowerCase())
-    );
-    setResults(filtered);
+  const loadContractors = async () => {
+    try {
+      setLoading(true);
+      const data = await contractorService.getAllContractors();
+      setAllContractors(data);
+      formatSections(data, searchQuery);
+    } catch (e: any) {
+      Alert.alert("Sync Error", "Failed to load workforce data: " + e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const renderContractor = ({ item }: { item: Contractor }) => (
-    <View style={styles.card}>
-      <View style={styles.row}>
-        <Text style={styles.name}>{item.name}</Text>
-        <View style={styles.specBadge}>
-          <Text style={styles.specText}>{item.specialism.replace('_', ' ')}</Text>
-        </View>
-      </View>
-      <Text style={styles.company}>{item.company}</Text>
-      
-      <View style={styles.qualList}>
-        {item.qualifications.map(q => (
-          <View 
-            key={q.id} 
-            style={[
-              styles.qualTag, 
-              { backgroundColor: q.isValid ? '#d4edda' : '#f8d7da' } 
-            ]}
-          >
-            <Text style={[
-              styles.tagText, 
-              { color: q.isValid ? COLORS.success : COLORS.secondary }
-            ]}>
-              {q.type}: {q.isValid ? 'VALID' : 'EXPIRED'}
-            </Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
+  const formatSections = (data: Contractor[], query: string) => {
+    const q = query.toLowerCase();
+    const filtered = data.filter(c => 
+      c.name?.toLowerCase().includes(q) || 
+      c.specialism?.toLowerCase().includes(q) ||
+      c.company?.toLowerCase().includes(q)
+    );
+
+    const sections = [
+      { 
+        title: '🟠 Awaiting Verification', 
+        data: filtered.filter(c => c.competence_status === 'Pending' && c.competence_evidence_url) 
+      },
+      { 
+        title: '🟢 Approved Specialists', 
+        data: filtered.filter(c => c.competence_status === 'Approved') 
+      },
+      { 
+        title: '⚪ Suspended / Others', 
+        data: filtered.filter(c => c.competence_status !== 'Approved' && c.competence_status !== 'Pending') 
+      }
+    ];
+    setFilteredSections(sections.filter(s => s.data.length > 0));
+  };
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', loadContractors);
+    return unsubscribe;
+  }, [navigation]);
+
+  useEffect(() => { 
+    formatSections(allContractors, searchQuery); 
+  }, [searchQuery, allContractors]);
 
   return (
-    <View style={styles.container}>
-      <TextInput 
-        style={styles.searchBar}
-        placeholder="Search Name, Company, or Specialism..."
-        placeholderTextColor={COLORS.textLight}
-        value={search}
-        onChangeText={handleSearch}
-      />
-      <FlatList 
-        data={results}
-        keyExtractor={(item) => item.id}
-        renderItem={renderContractor}
-        ListEmptyComponent={<Text style={styles.empty}>No contractors found.</Text>}
-        contentContainerStyle={{ paddingBottom: SPACING.l }}
-      />
-    </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.mainTitle}>Workforce Governance</Text>
+        <TextInput 
+          style={styles.searchBar} 
+          placeholder="Search by name, trade, or company..." 
+          placeholderTextColor="#999"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          editable={!loading}
+        />
+      </View>
+      
+      {loading ? (
+        <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
+      ) : (
+        <SectionList
+          sections={filteredSections}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              style={styles.card} 
+              onPress={() => navigation.navigate('ContractorDetail', { contractor: item })}
+            >
+              <View>
+                <Text style={styles.name}>{item.name}</Text>
+                <Text style={styles.sub}>{item.specialism || 'General'} Specialist</Text>
+              </View>
+              <Text style={styles.chevron}>→</Text>
+            </TouchableOpacity>
+          )}
+          renderSectionHeader={({ section: { title } }) => (
+            <Text style={styles.sectionHeader}>{title}</Text>
+          )}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>No contractors match your search.</Text>
+          }
+        />
+      )}
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    padding: SPACING.m, 
-    backgroundColor: COLORS.background 
-  } as ViewStyle,
-  searchBar: { 
-    backgroundColor: COLORS.white, 
-    padding: SPACING.s, 
-    borderRadius: 8, 
-    marginBottom: SPACING.m, 
-    borderWidth: 1, 
-    borderColor: COLORS.lightGray,
-    color: COLORS.text 
-  } as TextStyle,
-  card: { 
-    backgroundColor: COLORS.white, 
-    padding: SPACING.m, 
-    borderRadius: 8, 
-    marginBottom: SPACING.s, 
-    ...SHADOWS.light 
-  } as ViewStyle,
-  row: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    marginBottom: SPACING.xs 
-  } as ViewStyle,
-  name: { 
-    ...TYPOGRAPHY.subheader,
-    color: COLORS.primary 
-  } as TextStyle,
-  specBadge: { 
-    backgroundColor: COLORS.primary, 
-    paddingHorizontal: SPACING.s, 
-    paddingVertical: 4, 
-    borderRadius: 4 
-  } as ViewStyle,
-  specText: { 
-    color: COLORS.white, 
-    fontSize: 10, 
-    fontWeight: 'bold' 
-  } as TextStyle,
-  company: { 
-    ...TYPOGRAPHY.caption, 
-    fontSize: 14, 
-    marginBottom: SPACING.s 
-  } as TextStyle,
-  qualList: { 
-    borderTopWidth: 1, 
-    borderTopColor: COLORS.lightGray, 
-    paddingTop: SPACING.s 
-  } as ViewStyle,
-  qualTag: { 
-    padding: SPACING.xs, 
-    borderRadius: 4, 
-    marginBottom: SPACING.xs 
-  } as ViewStyle,
-  tagText: { 
-    fontSize: 12, 
-    fontWeight: 'bold' 
-  } as TextStyle,
-  empty: { 
-    textAlign: 'center', 
-    marginTop: SPACING.l, 
-    color: COLORS.textLight 
-  } as TextStyle
+  container: { flex: 1, backgroundColor: COLORS.background },
+  header: { padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
+  mainTitle: { ...TYPOGRAPHY.header, color: COLORS.primary },
+  searchBar: { backgroundColor: '#f5f5f5', padding: 12, borderRadius: 10, marginTop: 10, color: '#000' },
+  sectionHeader: { fontSize: 12, fontWeight: 'bold', color: COLORS.gray, marginTop: 25, marginBottom: 10, textTransform: 'uppercase' },
+  card: { backgroundColor: '#fff', padding: 15, borderRadius: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, ...SHADOWS.light },
+  name: { fontWeight: 'bold', fontSize: 16 },
+  sub: { fontSize: 12, color: COLORS.gray, marginTop: 2 },
+  chevron: { color: COLORS.primary, fontWeight: 'bold' },
+  loader: { marginTop: 50 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 40 },
+  emptyText: { textAlign: 'center', marginTop: 40, color: COLORS.gray }
 });

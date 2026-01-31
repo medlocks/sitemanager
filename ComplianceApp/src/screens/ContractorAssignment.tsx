@@ -1,141 +1,99 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, TextStyle, ViewStyle } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Incident, Contractor } from '../types';
-import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '../theme';
-
-const MOCK_CONTRACTORS: Contractor[] = [
-  { id: 'CON1', name: 'Dave Sparks', company: 'Volt-Check Ltd', specialism: 'ELECTRICAL', qualifications: [{ id: 'Q1', type: 'NICEIC', expiryDate: '2027-01-01', isValid: true }] },
-  { id: 'CON2', name: 'Sarah Vent', company: 'Air-Flow Hygiene', specialism: 'TR19_DUCTWORK', qualifications: [{ id: 'Q2', type: 'TR19 Certified', expiryDate: '2026-05-01', isValid: true }] }
-];
+import React, { useEffect, useState } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { contractorService, Contractor } from '../services/contractorService';
+import { COLORS, TYPOGRAPHY, SHADOWS } from '../theme';
 
 export const ContractorAssignment = ({ route, navigation }: any) => {
-  const { incidentId } = route.params;
-  const [incident, setIncident] = useState<Incident | null>(null);
+  const { incidentId, isAsset } = route.params;
+  const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [filtered, setFiltered] = useState<Contractor[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const fetchContractors = async () => {
+    try {
+      setLoading(true);
+      const data = await contractorService.getApprovedContractors();
+      setContractors(data);
+      setFiltered(data);
+    } catch (e: any) {
+      Alert.alert("Error", e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchIncident = async () => {
-      const data = await AsyncStorage.getItem('@incidents_vault');
-      if (data) {
-        const found = JSON.parse(data).find((i: Incident) => i.id === incidentId);
-        setIncident(found);
-      }
-    };
-    fetchIncident();
-  }, [incidentId]);
+    fetchContractors();
+  }, []);
 
-  const assignContractor = async (contractorName: string) => {
-    const data = await AsyncStorage.getItem('@incidents_vault');
-    if (data) {
-      const incidents = JSON.parse(data);
-      const updated = incidents.map((i: Incident) => 
-        i.id === incidentId ? { ...i, status: 'Assigned', assignedTo: contractorName } : i
-      );
-      await AsyncStorage.setItem('@incidents_vault', JSON.stringify(updated));
-      Alert.alert("Success", `Work order sent to ${contractorName}. Status: Assigned.`);
-      navigation.navigate('Dashboard');
+  useEffect(() => {
+    const q = search.toLowerCase();
+    setFiltered(
+      contractors.filter(c => 
+        c.name.toLowerCase().includes(q) || 
+        c.specialism?.toLowerCase().includes(q)
+      )
+    );
+  }, [search, contractors]);
+
+  const handleAssign = async (contractor: Contractor) => {
+    try {
+      setLoading(true);
+      await contractorService.assignToJob(incidentId, contractor.id, isAsset);
+      Alert.alert("Assigned", `Job dispatched to ${contractor.name}`);
+      navigation.goBack();
+    } catch (e: any) {
+      Alert.alert("Assignment Error", e.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Assign Qualified Contractor</Text>
-      
-      <View style={styles.incidentBox}>
-        <Text style={styles.label}>ISSUE DETAILS:</Text>
-        <Text style={styles.value}>{incident?.description}</Text>
-      </View>
-
-      <Text style={styles.subTitle}>Verified Specialist Directory</Text>
-      <FlatList 
-        data={MOCK_CONTRACTORS}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} onPress={() => assignContractor(item.name)}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.specialismBadge}>{item.specialism.replace('_', ' ')}</Text>
-            </View>
-            <Text style={styles.company}>{item.company}</Text>
-            <Text style={styles.statusText}>● System Verified & Compliant</Text>
-          </TouchableOpacity>
-        )}
+      <Text style={styles.title}>Dispatch Specialist</Text>
+      <TextInput 
+        style={styles.search} 
+        placeholder="Filter by name or specialism (e.g. Gas)..." 
+        placeholderTextColor="#999"
+        value={search} 
+        onChangeText={setSearch} 
       />
+      {loading ? (
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      ) : (
+        <FlatList 
+          data={filtered} 
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.card} onPress={() => handleAssign(item)}>
+              <View>
+                <Text style={styles.name}>{item.name}</Text>
+                <View style={styles.tag}>
+                  <Text style={styles.tagTxt}>{item.specialism || 'General'}</Text>
+                </View>
+              </View>
+              <Text style={styles.assignLink}>SELECT →</Text>
+            </TouchableOpacity>
+          )} 
+          ListEmptyComponent={
+            <Text style={styles.emptyTxt}>No approved specialists found.</Text>
+          }
+        />
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    padding: SPACING.l, 
-    backgroundColor: COLORS.background 
-  } as ViewStyle,
-  header: { 
-    ...TYPOGRAPHY.header, 
-    marginBottom: SPACING.l 
-  } as TextStyle,
-  incidentBox: { 
-    backgroundColor: COLORS.white, 
-    padding: SPACING.m, 
-    borderRadius: 8, 
-    marginBottom: SPACING.xl, 
-    borderLeftWidth: 5, 
-    borderLeftColor: COLORS.warning,
-    ...SHADOWS.light 
-  } as ViewStyle,
-  label: { 
-    ...TYPOGRAPHY.caption, 
-    fontWeight: 'bold', 
-    color: COLORS.gray 
-  } as TextStyle,
-  value: { 
-    ...TYPOGRAPHY.body, 
-    marginTop: SPACING.xs,
-    color: COLORS.text 
-  } as TextStyle,
-  subTitle: { 
-    ...TYPOGRAPHY.subheader, 
-    fontSize: 14, 
-    marginBottom: SPACING.m 
-  } as TextStyle,
-  card: { 
-    backgroundColor: COLORS.white, 
-    padding: SPACING.m, 
-    borderRadius: 8, 
-    marginBottom: SPACING.m, 
-    borderRightWidth: 5, 
-    borderRightColor: COLORS.success,
-    ...SHADOWS.light 
-  } as ViewStyle,
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.xs
-  } as ViewStyle,
-  name: { 
-    fontSize: 16, 
-    fontWeight: 'bold',
-    color: COLORS.text 
-  } as TextStyle,
-  specialismBadge: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4
-  } as TextStyle,
-  company: { 
-    ...TYPOGRAPHY.caption, 
-    fontSize: 12,
-    marginBottom: SPACING.s 
-  } as TextStyle,
-  statusText: { 
-    fontSize: 10, 
-    color: COLORS.success, 
-    fontWeight: 'bold' 
-  } as TextStyle
+  container: { flex: 1, padding: 20, backgroundColor: COLORS.background },
+  title: { ...TYPOGRAPHY.header, color: COLORS.primary, marginBottom: 15 },
+  search: { backgroundColor: '#fff', padding: 12, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#eee', color: '#000' },
+  card: { backgroundColor: '#fff', padding: 20, borderRadius: 12, marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', ...SHADOWS.light },
+  name: { fontWeight: 'bold', fontSize: 16 },
+  tag: { backgroundColor: COLORS.primary, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, marginTop: 4, alignSelf: 'flex-start' },
+  tagTxt: { color: '#fff', fontSize: 9, fontWeight: 'bold' },
+  assignLink: { color: COLORS.primary, fontWeight: 'bold' },
+  emptyTxt: { textAlign: 'center', color: '#999', marginTop: 20 }
 });

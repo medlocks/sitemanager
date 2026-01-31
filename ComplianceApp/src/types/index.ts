@@ -1,4 +1,4 @@
-export type UserRole = 'Admin' | 'SiteManager' | 'Contractor' | 'Employee';
+export type UserRole = 'Manager' | 'Employee' | 'Contractor';
 
 export type ServiceType = 'HVAC' | 'TR19_DUCTWORK' | 'GAS_SAFETY' | 'FIRE_SAFETY' | 'ELECTRICAL' | 'WATER_HYGIENE' | 'GENERAL';
 
@@ -11,22 +11,25 @@ export interface User {
 
 export interface Incident {
   id: string;
-  userId: string;
-  timestamp: string;
+  created_at: string; 
+  user_id: string;   
   description: string;
-  imageUri?: string;
-  status: 'Pending' | 'Synced' | 'Assigned' | 'Resolved';
-  assignedTo?: string;
+  location: string;
+  status: 'Pending' | 'Assigned' | 'Resolved';
+  assigned_to?: string; 
+  image_url?: string;
 }
 
 export interface ServiceReport {
   id: string;
-  type: ServiceType;
   assetName: string;
-  regulation: string;
+  type: string;
+  status: 'Compliant' | 'Non-Compliant';
   lastServiceDate: string;
   nextServiceDueDate: string;
-  status: 'Compliant' | 'Urgent Action' | 'Overdue';
+  regulation: string;
+  assigned_to?: string;      // Add this (optional)
+  task_status?: string;     // Add this (optional)
 }
 
 export interface Qualification {

@@ -4,17 +4,18 @@ import {
   Text, 
   TextInput, 
   StyleSheet, 
-  TouchableOpacity, 
   Alert, 
   ScrollView, 
   Image, 
+  TouchableOpacity, 
+  ActivityIndicator,
   TextStyle, 
   ViewStyle, 
   ImageStyle 
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
-import { saveIncidentLocally } from '../services/storageService';
+import { incidentService } from '../services/incidentService';
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '../theme';
 
 export const FaultReporting = ({ navigation }: any) => {
@@ -22,11 +23,12 @@ export const FaultReporting = ({ navigation }: any) => {
   const [fault, setFault] = useState('');
   const [location, setLocation] = useState('');
   const [image, setImage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert("Permission Denied", "Camera access is required for digital evidence (R15).");
+      Alert.alert("Permission Denied", "Camera access is required for digital evidence.");
       return;
     }
 
@@ -47,28 +49,32 @@ export const FaultReporting = ({ navigation }: any) => {
       return;
     }
 
-    const faultLog = {
-      id: Date.now().toString(),
-      userId: user?.id || 'Employee',
-      timestamp: new Date().toISOString(),
-      description: `FAULT REPORT: ${fault} at ${location}`,
-      imageUri: image || undefined,
-      status: 'Pending' as const
-    };
-
-    await saveIncidentLocally(faultLog);
-    
-    Alert.alert(
-      "Compliance Logged", 
-      "The Site Manager has been notified via the central dashboard. Photo evidence is attached to the audit trail."
-    );
-    navigation.goBack();
+    try {
+      setLoading(true);
+      await incidentService.createIncident(
+        `FAULT REPORT: ${fault}`, 
+        location, 
+        image || undefined,
+        user?.id
+      );
+      
+      Alert.alert(
+        "Compliance Logged", 
+        "The report is now live in the central audit vault. Photo evidence is attached to the audit trail."
+      );
+      
+      navigation.goBack();
+    } catch (error: any) {
+      Alert.alert("Submission Error", error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Report a Fault or Hazard</Text>
-      <Text style={styles.subtitle}>Statutory Evidence Capture (ISO 45001)</Text>
+      <Text style={styles.subtitle}>Statutory Evidence Capture</Text>
 
       <Text style={styles.label}>Where is the issue?</Text>
       <TextInput 
@@ -82,7 +88,7 @@ export const FaultReporting = ({ navigation }: any) => {
       <Text style={styles.label}>Describe the fault</Text>
       <TextInput 
         style={[styles.input, { height: 100 }]} 
-        placeholder="e.g. Lights not working, leaking tap, broken socket..." 
+        placeholder="e.g. Lights not working, leaking tap..." 
         multiline
         value={fault}
         onChangeText={setFault}
@@ -90,23 +96,31 @@ export const FaultReporting = ({ navigation }: any) => {
         placeholderTextColor={COLORS.textLight}
       />
 
-      <TouchableOpacity style={styles.photoBtn} onPress={takePhoto}>
+      <TouchableOpacity style={styles.photoBtn} onPress={takePhoto} disabled={loading}>
         <Text style={styles.photoBtnText}>
-          {image ? "✅ PHOTO ATTACHED" : "📸 ATTACH PHOTO EVIDENCE (R15)"}
+          {image ? "✅ PHOTO ATTACHED" : "📸 ATTACH PHOTO EVIDENCE"}
         </Text>
       </TouchableOpacity>
 
       {image && (
         <View style={styles.previewContainer}>
           <Image source={{ uri: image }} style={styles.preview} />
-          <TouchableOpacity onPress={() => setImage(null)}>
+          <TouchableOpacity onPress={() => setImage(null)} disabled={loading}>
             <Text style={styles.removePhoto}>Remove Photo</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      <TouchableOpacity style={styles.submitBtn} onPress={submitFault}>
-        <Text style={styles.btnText}>Submit Report to Site Manager</Text>
+      <TouchableOpacity 
+        style={[styles.submitBtn, loading && { backgroundColor: COLORS.gray }]} 
+        onPress={submitFault} 
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color={COLORS.white} />
+        ) : (
+          <Text style={styles.btnText}>Submit Report to Live Vault</Text>
+        )}
       </TouchableOpacity>
     </ScrollView>
   );

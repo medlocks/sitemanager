@@ -8,14 +8,16 @@ import {
   Switch, 
   Alert, 
   TextStyle, 
-  ViewStyle 
+  ViewStyle,
+  ActivityIndicator
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { saveIncidentLocally } from '../services/storageService';
+import { incidentService } from '../services/incidentService';
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '../theme';
 
 export const FireRiskAssessment = ({ navigation }: any) => {
   const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
   const [checks, setChecks] = useState({
     exitsClear: false,
     extinguishersPresent: false,
@@ -26,35 +28,46 @@ export const FireRiskAssessment = ({ navigation }: any) => {
 
   const handleSubmission = async () => {
     const failedChecks = Object.values(checks).filter(val => val === false).length;
+    const statusLabel = failedChecks === 0 ? 'PASS' : 'FAIL - ACTION REQUIRED';
+    const incidentStatus = failedChecks === 0 ? 'Pending' : 'High Risk';
     
-    const assessmentLog = {
-      id: Date.now().toString(),
-      userId: user?.id || 'unknown',
-      timestamp: new Date().toISOString(),
-      description: `Daily FRA Completed. Safety Status: ${failedChecks === 0 ? 'PASS' : 'FAIL - ACTION REQUIRED'}`,
-      status: 'Pending' as const
-    };
+    const description = `Daily FRA Completed. Safety Status: ${statusLabel}. Issues: ${
+      failedChecks === 0 ? 'None' : 'Statutory failures detected during walkthrough.'
+    }`;
 
-    await saveIncidentLocally(assessmentLog);
+    try {
+      setLoading(true);
+      await incidentService.createIncident(
+        description, 
+        "Site-Wide Walkthrough", 
+        undefined, 
+        user?.id, 
+        incidentStatus
+      );
 
-    if (failedChecks > 0) {
-      Alert.alert(
-        "High Risk Detected", 
-        "One or more fire safety checks failed. An urgent incident report has been logged in the Audit Vault."
-      );
-    } else {
-      Alert.alert(
-        "Site Compliant", 
-        "Daily Fire Risk Assessment logged successfully."
-      );
+      if (failedChecks > 0) {
+        Alert.alert(
+          "High Risk Detected", 
+          "One or more fire safety checks failed. An urgent incident report has been logged in the Live Audit Vault."
+        );
+      } else {
+        Alert.alert(
+          "Site Compliant", 
+          "Daily Fire Risk Assessment logged successfully to live database."
+        );
+      }
       navigation.goBack();
+    } catch (error: any) {
+      Alert.alert("Sync Failure", "Could not upload FRA log: " + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Daily Fire Risk Assessment</Text>
-      <Text style={styles.subtitle}>Statutory Walkthrough (ISO 45001 / BS 9999)</Text>
+      <Text style={styles.subtitle}>Statutory Walkthrough</Text>
 
       <View style={styles.listContainer}>
         <View style={styles.checkItem}>
@@ -108,8 +121,16 @@ export const FireRiskAssessment = ({ navigation }: any) => {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.submitBtn} onPress={handleSubmission}>
-        <Text style={styles.btnText}>Submit Verified FRA Log (R7)</Text>
+      <TouchableOpacity 
+        style={[styles.submitBtn, loading && { opacity: 0.7 }]} 
+        onPress={handleSubmission}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color={COLORS.white} />
+        ) : (
+          <Text style={styles.btnText}>Submit Verified FRA Log</Text>
+        )}
       </TouchableOpacity>
     </ScrollView>
   );
