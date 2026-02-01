@@ -40,8 +40,6 @@ export const assetService = {
   async updateAsset(id: string, asset: Asset) {
     const state = await NetInfo.fetch();
     if (!state.isConnected) {
-      // For updates, the syncService enqueue would need logic to handle UPDATE actions vs INSERT
-      // For current logic consistency:
       await syncService.enqueue('assets_updates', { id, ...asset });
       return { offline: true };
     }

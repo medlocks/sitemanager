@@ -17,7 +17,7 @@ describe('BuildingService', () => {
         regulation: 'Gas Safe',
         location: 'Plant Room',
         status: 'Compliant',
-        last_service_date: '2025-01-01',
+        last_service: '2025-01-01',
         next_service_due: '2026-01-01',
         min_clearance_required: '2m'
       }

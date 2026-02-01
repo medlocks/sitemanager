@@ -18,7 +18,7 @@ export const buildingService = {
       regulation: item.regulation,
       location: item.location,
       status: item.status,
-      lastServiceDate: item.last_service_date,
+      lastServiceDate: item.last_service,
       nextServiceDueDate: item.next_service_due,
       minClearance: item.min_clearance_required
     }));

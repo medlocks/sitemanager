@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase';
-
 import NetInfo from '@react-native-community/netinfo';
 import { syncService } from './syncService';
 import { fileService } from './fileService';
@@ -34,29 +33,30 @@ export const workOrderService = {
 
   async resolveTask(userId: string, task: any, formData: any) {
     const state = await NetInfo.fetch();
-    const resolvedAt = new Date().toISOString();
-    const nextDueStr = formData.nextDueDate.toISOString().split('T')[0];
+    const nowISO = new Date().toISOString();
+    const todayStr = nowISO.split('T')[0];
+    
+    let nextDueStr = null;
+    if (formData.nextDueDate) {
+      const d = new Date(formData.nextDueDate);
+      nextDueStr = !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : null;
+    }
 
     if (!state.isConnected) {
-      const offlinePayload = {
+      await syncService.enqueue('work_order_resolutions', {
         userId,
         taskId: task.id,
         isAssetTask: task.isAssetTask,
-        formData: {
-          ...formData,
-          resolvedAt,
-          nextDueStr,
-          evidenceFileUri: formData.evidenceFile?.uri
-        }
-      };
-      await syncService.enqueue('work_order_resolutions', offlinePayload);
+        formData: { ...formData, resolvedAt: nowISO, nextDueStr }
+      });
       return { offline: true };
     }
 
-    let publicUrl = task.evidence_url;
+    let publicUrl = task.evidence_url || task.resolved_image_url;
 
     if (formData.evidenceFile) {
-      const fileName = `resolution_${task.id}_${Date.now()}.${formData.evidenceFile.name.split('.').pop()}`;
+      const fileExt = formData.evidenceFile.uri.toLowerCase().endsWith('.pdf') ? 'pdf' : 'jpg';
+      const fileName = `res_${task.id}_${Date.now()}.${fileExt}`;
       publicUrl = await fileService.uploadFile('incident-evidence', fileName, formData.evidenceFile.uri);
     }
 
@@ -65,21 +65,30 @@ export const workOrderService = {
         .from('assets')
         .update({ 
           status: 'Compliant', 
-          last_service_date: resolvedAt.split('T')[0],
+          last_service: todayStr,
           next_service_due: nextDueStr,
-          evidence_url: publicUrl 
+          evidence_url: publicUrl,
+          signed_off_by: userId,
+          signed_by_name: formData.signedByName
         })
         .eq('id', task.id);
 
       if (assetError) throw assetError;
 
-      await supabase.from('maintenance_logs').insert([{
+      const { error: logError } = await supabase.from('maintenance_logs').insert([{
         asset_id: task.id,
         performed_by: userId,
+        service_type: task.type || 'Statutory Maintenance',
+        service_date: nowISO,
+        next_due_date: nextDueStr || todayStr,
         notes: formData.resolutionNotes,
-        next_due_date: nextDueStr,
-        evidence_url: publicUrl
+        remedial_actions: formData.remedialActions,
+        evidence_url: publicUrl,
+        certificate_url: publicUrl, // Matches your schema
+        signature_url: formData.signedByName
       }]);
+      
+      if (logError) console.error("Maintenance Log Error:", logError);
 
     } else {
       const { error: resolveError } = await supabase
@@ -90,22 +99,11 @@ export const workOrderService = {
           remedial_actions: formData.remedialActions,
           signed_off_by: formData.signedByName,
           resolved_image_url: publicUrl,
-          resolved_at: resolvedAt
+          resolved_at: nowISO
         })
         .eq('id', task.id);
 
       if (resolveError) throw resolveError;
-
-      if (formData.requiresNextService) {
-        await supabase.from('incidents').insert([{
-          description: `PLANNED RENEWAL: ${task.description.replace('STATUTORY: ', '')}`,
-          location: task.location,
-          status: 'Pending',
-          due_date: nextDueStr,
-          type: 'Planned',
-          user_id: userId
-        }]);
-      }
     }
     return true;
   }

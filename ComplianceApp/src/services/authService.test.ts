@@ -9,43 +9,54 @@ describe('AuthService', () => {
     (supabase.from as jest.Mock).mockReturnThis();
   });
 
-  it('should call signInWithPassword with correct credentials', async () => {
-    const email = 'test@raytheon.com';
-    const password = 'password123';
-    
-    await authService.signIn(email, password);
+  it('should call signInWithPassword and then fetch the user profile', async () => {
+    const mockAuthUser = { id: 'u123', email: 'test@raytheon.com' };
+    const mockProfile = { name: 'Blake', role: 'Manager' };
+
+    (supabase.auth.signInWithPassword as jest.Mock).mockResolvedValue({
+      data: { user: mockAuthUser },
+      error: null,
+    });
+
+    const mockChain = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: mockProfile, error: null }),
+    };
+    (supabase.from as jest.Mock).mockReturnValue(mockChain);
+
+    const result = await authService.signIn('test@raytheon.com', 'password123');
 
     expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({
-      email,
-      password,
+      email: 'test@raytheon.com',
+      password: 'password123',
     });
-  });
-
-  it('should fetch and format profile data correctly', async () => {
-    const mockProfile = { name: 'Blake', role: 'Manager' };
     
-    (supabase.from('') as any).maybeSingle.mockResolvedValue({ 
-      data: mockProfile, 
-      error: null 
-    });
-
-    const result = await authService.getProfile('uid_123');
-
-    expect(result).toEqual({
-      id: 'uid_123',
-      name: 'Blake',
-      role: 'Manager',
-      isAuthorized: true
-    });
+    expect(result.role).toBe('Manager');
+    expect(result.name).toBe('Blake');
   });
 
-  it('should return null if no profile exists', async () => {
-    (supabase.from('') as any).maybeSingle.mockResolvedValue({ 
-      data: null, 
-      error: null 
+  it('should throw error if auth succeeds but profile is missing', async () => {
+    (supabase.auth.signInWithPassword as jest.Mock).mockResolvedValue({
+      data: { user: { id: 'u999' } },
+      error: null,
     });
 
-    const result = await authService.getProfile('missing_uid');
-    expect(result).toBeNull();
+    const mockChain = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    };
+    (supabase.from as jest.Mock).mockReturnValue(mockChain);
+
+    await expect(authService.signIn('bad@user.com', 'pass'))
+      .rejects
+      .toThrow('Access Denied: No profile associated with this account.');
+  });
+
+  it('should call signOut', async () => {
+    (supabase.auth.signOut as jest.Mock).mockResolvedValue({ error: null });
+    await authService.signOut();
+    expect(supabase.auth.signOut).toHaveBeenCalled();
   });
 });

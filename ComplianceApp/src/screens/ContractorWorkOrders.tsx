@@ -3,250 +3,256 @@ import {
   View, Text, FlatList, StyleSheet, TouchableOpacity, 
   Alert, ActivityIndicator, Modal, TextInput, Image, ScrollView, SafeAreaView, Switch 
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { supabase } from '../lib/supabase';
 import { workOrderService } from '../services/workOrderService';
-import { notificationService } from '../services/notificationService';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '../theme';
+import { notificationService } from '../services/notificationService';
 
 export const ContractorWorkOrders = ({ navigation }: any) => {
   const { user } = useAuth();
   const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
-  
-  const [resolutionNotes, setResolutionNotes] = useState('');
-  const [remedialActions, setRemedialActions] = useState('');
-  const [signedByName, setSignedByName] = useState('');
-  const [requiresNextService, setRequiresNextService] = useState(false);
-  const [nextDueDate, setNextDueDate] = useState(new Date());
+  const [form, setForm] = useState({
+    notes: '',
+    remedial: '',
+    signature: '',
+    nextService: false,
+    date: new Date()
+  });
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [evidenceFile, setEvidenceFile] = useState<any | null>(null);
+  const [evidence, setEvidence] = useState<any | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
   const loadTasks = async () => {
     if (!user?.id) return;
     try {
       setLoading(true);
-      const [tasks, notifications] = await Promise.all([
-        workOrderService.getAssignedTasks(user.id),
-        notificationService.getNotificationLog(user.id)
-      ]);
+      const tasks = await workOrderService.getAssignedTasks(user.id);
       setAssignedTasks(tasks);
-      if (notifications){
-      setUnreadCount(notifications.filter((n: any) => !n.is_read).length);
-      }
     } catch (e: any) {
-      Alert.alert("Error", e.message);
+      Alert.alert("System Error", e.message);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('Notifications')} 
-          style={styles.notifBadgeContainer}
-        >
-          <Text style={styles.notifIcon}>🔔</Text>
-          {unreadCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      ),
-      headerRight: () => (
-        <TouchableOpacity onPress={() => navigation.navigate('ContractorProfile')} style={{ marginRight: 15 }}>
-          <Text style={{ color: COLORS.primary, fontWeight: 'bold' }}>MY PROFILE</Text>
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation, unreadCount]);
+  useEffect(() => { loadTasks(); }, []);
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', loadTasks);
-    
-    const channel = supabase
-      .channel('notif_sync_contractor')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_notifications' }, () => loadTasks())
-      .subscribe();
-
-    return () => {
-      unsubscribe();
-      supabase.removeChannel(channel);
-    };
-  }, [navigation, user]);
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setForm(prev => ({ ...prev, date: selectedDate }));
+    }
+  };
 
   const takePhoto = async () => {
     const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.4 });
     if (!result.canceled) {
-      setEvidenceFile({ uri: result.assets[0].uri, name: 'camera_capture.jpg', isImage: true });
+      setEvidence({ uri: result.assets[0].uri, name: 'capture.jpg', isImage: true });
     }
   };
 
-  const pickDocument = async () => {
+  const pickFile = async () => {
     const res = await DocumentPicker.getDocumentAsync({ type: ['image/*', 'application/pdf'] });
     if (!res.canceled) {
-      setEvidenceFile({ 
+      setEvidence({ 
         uri: res.assets[0].uri, 
         name: res.assets[0].name, 
-        isImage: res.assets[0].mimeType?.includes('image') || false 
+        isImage: res.assets[0].mimeType?.includes('image')
       });
     }
   };
 
   const handleResolution = async () => {
-    if (!evidenceFile || !resolutionNotes || !signedByName || !user?.id) {
-      Alert.alert("Compliance Block", "Evidence, Notes, and Signature are mandatory.");
+    if (!evidence || !form.notes || !form.signature) {
+      Alert.alert("Compliance Block", "Missing required evidence or signature.");
       return;
     }
-
     try {
       setIsUploading(true);
-      await workOrderService.resolveTask(user.id, selectedTask, {
-        evidenceFile,
-        resolutionNotes,
-        remedialActions,
-        signedByName,
-        requiresNextService,
-        nextDueDate
+      let finalIsoDate = null;
+      if (form.nextService) {
+        const dateObj = form.date instanceof Date ? form.date : new Date(form.date);
+        finalIsoDate = !isNaN(dateObj.getTime()) ? dateObj.toISOString() : new Date().toISOString();
+      }
+      await workOrderService.resolveTask(user!.id, selectedTask, {
+        evidenceFile: evidence,
+        resolutionNotes: form.notes,
+        remedialActions: form.remedial,
+        signedByName: form.signature,
+        requiresNextService: form.nextService,
+        nextDueDate: finalIsoDate
       });
-      
-      Alert.alert("Record Sealed", "Task resolved and stored in the database.");
+      await notificationService.notifyManagers(
+        "WORK ORDER COMPLETED",
+        `Contractor ${user?.name} has submitted sign-off for: ${selectedTask.description}`,
+        "WORK_ORDER"
+      );
+      Alert.alert("Success", "Regulatory record sealed.");
       setUploadModalVisible(false);
-      resetForm();
       loadTasks();
     } catch (e: any) {
-      Alert.alert("Submission Failed", e.message);
+      Alert.alert("Sync Error", e.message);
     } finally {
       setIsUploading(false);
     }
   };
 
-  const resetForm = () => {
-    setEvidenceFile(null);
-    setResolutionNotes('');
-    setRemedialActions('');
-    setSignedByName('');
-    setRequiresNextService(false);
+  const displayDateText = () => {
+    const d = form.date instanceof Date ? form.date : new Date(form.date);
+    return isNaN(d.getTime()) ? 'Select Date' : d.toLocaleDateString('en-GB');
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.header}>Contractor Portal</Text>
-
-      <View style={styles.quickActions}>
+      <View style={styles.quickRow}>
         <TouchableOpacity 
-          style={[styles.actionBtn, { backgroundColor: COLORS.secondary }]} 
+          testID="btn-accident"
+          style={styles.quickBtn} 
           onPress={() => navigation.navigate('LogAccident')}
         >
-          <Text style={styles.actionIcon}>🚨</Text>
-          <Text style={styles.actionText}>LOG ACCIDENT</Text>
+          <Ionicons name="medical" size={20} color="#FF4D4F" />
+          <Text style={styles.quickBtnText}>ACCIDENT</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.actionBtn, { backgroundColor: COLORS.warning }]} 
+          testID="btn-fault"
+          style={styles.quickBtn} 
           onPress={() => navigation.navigate('FaultReporting')}
         >
-          <Text style={styles.actionIcon}>⚠️</Text>
-          <Text style={styles.actionText}>REPORT FAULT</Text>
+          <Ionicons name="warning" size={20} color="#FAAD14" />
+          <Text style={styles.quickBtnText}>FAULT</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          testID="btn-profile"
+          style={[styles.quickBtn, { borderLeftWidth: 2, borderLeftColor: COLORS.primary }]} 
+          onPress={() => navigation.navigate('ContractorProfile')}
+        >
+          <Ionicons name="person-circle" size={22} color={COLORS.primary} />
+          <Text style={[styles.quickBtnText, { color: COLORS.primary }]}>PROFILE</Text>
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.subHeader}>Assigned Work Orders</Text>
-
-      {loading ? <ActivityIndicator size="large" color={COLORS.primary} /> : (
-        <FlatList 
-          data={assignedTasks}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <View style={{flex: 1}}>
-                <Text style={styles.cardTitle}>{item.description}</Text>
-                <Text style={styles.cardLoc}>📍 {item.location}</Text>
-                {item.isAssetTask && <Text style={styles.assetBadge}>SYSTEM ASSET</Text>}
-              </View>
-              <TouchableOpacity style={styles.openBtn} onPress={() => { setSelectedTask(item); setUploadModalVisible(true); }}>
-                <Text style={styles.openBtnText}>SIGN OFF</Text>
-              </TouchableOpacity>
+      <FlatList 
+        data={assignedTasks}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item, index }) => (
+          <View style={styles.orderCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.orderTitle}>{item.description}</Text>
+              <Text style={styles.orderLoc}>{item.location}</Text>
             </View>
-          )}
-          ListEmptyComponent={<Text style={styles.emptyText}>No active jobs.</Text>}
-          contentContainerStyle={{ padding: SPACING.m, paddingBottom: 100 }}
-        />
-      )}
+            <TouchableOpacity 
+              testID={`sign-off-btn-${index}`}
+              style={styles.signBtn} 
+              onPress={() => { setSelectedTask(item); setUploadModalVisible(true); }}
+            >
+              <Text style={styles.signBtnText}>SIGN OFF</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        ListEmptyComponent={<Text style={styles.emptyText}>No assigned work orders found.</Text>}
+        contentContainerStyle={{ padding: 20 }}
+      />
 
       <Modal visible={uploadModalVisible} animationType="slide">
-        <SafeAreaView style={styles.modalBg}>
-          <ScrollView contentContainerStyle={styles.modalScroll}>
-            <Text style={styles.modalTitle}>{selectedTask?.isAssetTask ? 'Asset Certification' : 'Incident Resolution'}</Text>
-            
-            <Text style={styles.sectionLabel}>1. EVIDENCE ATTACHMENT</Text>
-            <View style={styles.uploadRow}>
-                <TouchableOpacity style={styles.uploadOption} onPress={takePhoto}>
-                    <Text style={styles.uploadIcon}>📸</Text>
-                    <Text style={styles.uploadText}>Camera</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.uploadOption} onPress={pickDocument}>
-                    <Text style={styles.uploadIcon}>📁</Text>
-                    <Text style={styles.uploadText}>Files/PDF</Text>
-                </TouchableOpacity>
+        <SafeAreaView style={styles.modalContent}>
+          <ScrollView contentContainerStyle={{ padding: 25 }}>
+            <Text style={styles.modalHeader}>STATUTORY CERTIFICATION</Text>
+            <View style={styles.fileRow}>
+              <TouchableOpacity testID="upload-camera" style={styles.fileBtn} onPress={takePhoto}>
+                <Ionicons name="camera" size={24} color={COLORS.primary} />
+                <Text style={styles.fileBtnText}>Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity testID="upload-attach" style={styles.fileBtn} onPress={pickFile}>
+                <Ionicons name="document-attach" size={24} color={COLORS.primary} />
+                <Text style={styles.fileBtnText}>Attach</Text>
+              </TouchableOpacity>
             </View>
-
-            {evidenceFile && (
-                <View style={styles.previewContainer}>
-                    {evidenceFile.isImage ? (
-                        <Image source={{ uri: evidenceFile.uri }} style={styles.imagePreview} />
-                    ) : (
-                        <View style={styles.pdfPlaceholder}><Text style={styles.pdfText}>📄 {evidenceFile.name}</Text></View>
-                    )}
-                    <TouchableOpacity onPress={() => setEvidenceFile(null)}><Text style={styles.removeText}>Remove File</Text></TouchableOpacity>
-                </View>
-            )}
-
-            <Text style={styles.sectionLabel}>2. WORK NOTES</Text>
-            <TextInput style={[styles.input, { height: 70 }]} placeholder="Summary of work..." multiline value={resolutionNotes} onChangeText={setResolutionNotes} />
-
-            {!selectedTask?.isAssetTask && (
-              <>
-                <Text style={styles.sectionLabel}>3. REMEDIAL ACTIONS</Text>
-                <TextInput style={styles.input} placeholder="Anything else need fixing?" value={remedialActions} onChangeText={setRemedialActions} />
-              </>
-            )}
-
-            <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>SCHEDULE NEXT SERVICE?</Text>
-              <Switch value={requiresNextService} onValueChange={setRequiresNextService} trackColor={{ false: "#ddd", true: COLORS.secondary }} />
-            </View>
-
-            {requiresNextService && (
-              <View>
-                <Text style={styles.sectionLabel}>FUTURE DUE DATE</Text>
-                <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowDatePicker(true)}>
-                  <Text style={styles.dateText}>📅 {nextDueDate.toDateString()}</Text>
-                </TouchableOpacity>
-                {showDatePicker && (
-                  <DateTimePicker value={nextDueDate} mode="date" display="default" onChange={(_event: any, date?: Date) => { setShowDatePicker(false); if (date) setNextDueDate(date); }} />
-                )}
+            {evidence && (
+              <View style={styles.preview}>
+                {evidence.isImage ? <Image source={{ uri: evidence.uri }} style={styles.img} /> : <Text style={styles.fileAttached}>File Attached: {evidence.name}</Text>}
               </View>
             )}
-
-            <Text style={styles.sectionLabel}>5. SIGNATURE (PRINT NAME)</Text>
-            <TextInput style={styles.input} placeholder="Full Name" value={signedByName} onChangeText={setSignedByName} />
-
-            <TouchableOpacity style={styles.submitBtn} onPress={handleResolution} disabled={isUploading}>
-              {isUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>SUBMIT COMPLIANCE DATA</Text>}
+            <Text style={styles.inputLabel}>RESOLUTION NOTES</Text>
+            <TextInput 
+              testID="input-notes"
+              style={[styles.input, { height: 80 }]} 
+              placeholder="Detailed summary of work completed..." 
+              placeholderTextColor="#4A5568"
+              multiline 
+              value={form.notes} 
+              onChangeText={(t) => setForm({...form, notes: t})} 
+            />
+            <Text style={styles.inputLabel}>REMEDIAL ACTIONS TAKEN</Text>
+            <TextInput 
+              testID="input-remedial"
+              style={[styles.input, { height: 80 }]} 
+              placeholder="Describe any fixes or secondary actions..." 
+              placeholderTextColor="#4A5568"
+              multiline 
+              value={form.remedial} 
+              onChangeText={(t) => setForm({...form, remedial: t})} 
+            />
+            <Text style={styles.inputLabel}>DIGITAL SIGNATURE</Text>
+            <TextInput 
+              testID="input-signature"
+              style={styles.input} 
+              placeholder="Type Full Name" 
+              placeholderTextColor="#4A5568"
+              value={form.signature} 
+              onChangeText={(t) => setForm({...form, signature: t})} 
+            />
+            <View style={styles.switchBox}>
+              <View>
+                <Text style={styles.switchLabel}>NEXT SERVICE REQUIRED?</Text>
+                {form.nextService && (
+                   <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+                      <Text style={styles.dateDisplay}>
+                        Scheduled: {displayDateText()}
+                      </Text>
+                   </TouchableOpacity>
+                )}
+              </View>
+              <Switch 
+                testID="switch-next-service"
+                value={form.nextService} 
+                onValueChange={(v) => {
+                  setForm({...form, nextService: v});
+                  if(v) setShowDatePicker(true);
+                }} 
+              />
+            </View>
+            {showDatePicker && (
+              <DateTimePicker
+                value={form.date instanceof Date ? form.date : new Date()}
+                mode="date"
+                display="default"
+                minimumDate={new Date()}
+                onChange={onDateChange}
+              />
+            )}
+            <TouchableOpacity 
+              testID="btn-submit-resolution"
+              style={styles.submit} 
+              onPress={handleResolution} 
+              disabled={isUploading}
+            >
+              {isUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>SEAL RECORD & COMMIT</Text>}
             </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => setUploadModalVisible(false)} style={styles.cancelBtn}><Text style={styles.cancelText}>CANCEL</Text></TouchableOpacity>
+            <TouchableOpacity 
+              testID="btn-close-modal"
+              onPress={() => setUploadModalVisible(false)} 
+              style={styles.cancel}
+            >
+              <Text style={styles.cancelText}>ABORT & CLOSE</Text>
+            </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -255,44 +261,31 @@ export const ContractorWorkOrders = ({ navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: { ...TYPOGRAPHY.header, paddingHorizontal: SPACING.m, paddingTop: SPACING.m, color: COLORS.primary },
-  notifBadgeContainer: { marginLeft: 20, position: 'relative' },
-  notifIcon: { fontSize: 22 },
-  badge: { position: 'absolute', right: -6, top: -4, backgroundColor: COLORS.secondary, borderRadius: 10, width: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.white },
-  badgeText: { color: COLORS.white, fontSize: 10, fontWeight: 'bold' },
-  subHeader: { fontSize: 12, fontWeight: 'bold', color: COLORS.gray, paddingHorizontal: SPACING.m, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 },
-  quickActions: { flexDirection: 'row', justifyContent: 'space-between', padding: SPACING.m, marginBottom: 5 },
-  actionBtn: { flex: 0.48, padding: 15, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', ...SHADOWS.light },
-  actionIcon: { fontSize: 18, marginRight: 8 },
-  actionText: { color: COLORS.white, fontWeight: 'bold', fontSize: 11 },
-  card: { backgroundColor: COLORS.white, borderRadius: 12, padding: 18, marginBottom: 12, flexDirection: 'row', alignItems: 'center', marginHorizontal: SPACING.m, ...SHADOWS.light },
-  cardTitle: { fontWeight: 'bold', fontSize: 15 },
-  cardLoc: { fontSize: 11, color: COLORS.gray, marginTop: 4 },
-  assetBadge: { fontSize: 9, fontWeight: 'bold', color: COLORS.secondary, marginTop: 5 },
-  openBtn: { backgroundColor: COLORS.primary, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8 },
-  openBtnText: { color: COLORS.white, fontWeight: 'bold', fontSize: 12 },
-  emptyText: { textAlign: 'center', marginTop: 50, color: COLORS.gray },
-  modalBg: { flex: 1, backgroundColor: COLORS.white },
-  modalScroll: { padding: 25 },
-  modalTitle: { ...TYPOGRAPHY.header, textAlign: 'center', marginBottom: 25, color: COLORS.primary },
-  sectionLabel: { fontSize: 10, fontWeight: 'bold', color: COLORS.gray, marginBottom: 8, letterSpacing: 1 },
-  uploadRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  uploadOption: { flex: 0.48, height: 80, backgroundColor: '#f0f4f8', borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#d0d7de', borderStyle: 'dashed' },
-  uploadIcon: { fontSize: 24, marginBottom: 4 },
-  uploadText: { fontSize: 12, fontWeight: 'bold', color: COLORS.primary },
-  previewContainer: { marginBottom: 20, alignItems: 'center' },
-  imagePreview: { width: '100%', height: 180, borderRadius: 12 },
-  pdfPlaceholder: { width: '100%', padding: 20, backgroundColor: '#fffbe6', borderRadius: 12, borderWidth: 1, borderColor: '#ffe58f', alignItems: 'center' },
-  pdfText: { fontWeight: 'bold', color: '#856404' },
-  removeText: { marginTop: 8, color: COLORS.warning, fontWeight: 'bold', fontSize: 12 },
-  input: { backgroundColor: '#f9f9f9', borderRadius: 10, padding: 15, marginBottom: 20, borderWidth: 1, borderColor: '#eee' },
-  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, backgroundColor: '#f0f4f8', padding: 15, borderRadius: 10 },
-  switchLabel: { fontWeight: 'bold', fontSize: 11, color: COLORS.primary },
-  datePickerBtn: { backgroundColor: COLORS.white, padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#ddd', marginBottom: 20 },
-  dateText: { fontWeight: 'bold' },
-  submitBtn: { backgroundColor: COLORS.success, padding: 18, borderRadius: 12, alignItems: 'center' },
-  submitText: { color: COLORS.white, fontWeight: 'bold', fontSize: 16 },
-  cancelBtn: { padding: 20, alignItems: 'center' },
-  cancelText: { color: COLORS.gray, fontWeight: 'bold' }
+  container: { flex: 1, backgroundColor: '#F4F7FA' },
+  quickRow: { flexDirection: 'row', gap: 10, padding: 20 },
+  quickBtn: { flex: 1, height: 50, backgroundColor: COLORS.white, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, ...SHADOWS.light },
+  quickBtnText: { fontSize: 11, fontWeight: '800', color: COLORS.primary },
+  orderCard: { backgroundColor: COLORS.white, borderRadius: 16, padding: 20, marginBottom: 15, flexDirection: 'row', alignItems: 'center', ...SHADOWS.light },
+  orderTitle: { fontSize: 15, fontWeight: '700', color: COLORS.primary },
+  orderLoc: { fontSize: 12, color: COLORS.textLight, marginTop: 4 },
+  signBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 10 },
+  signBtnText: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
+  emptyText: { textAlign: 'center', marginTop: 100, color: COLORS.lightGray },
+  modalContent: { flex: 1, backgroundColor: COLORS.white },
+  modalHeader: { fontSize: 16, fontWeight: '900', textAlign: 'center', marginBottom: 25, color: COLORS.primary, letterSpacing: 2 },
+  fileRow: { flexDirection: 'row', gap: 15, marginBottom: 20 },
+  fileBtn: { flex: 1, height: 70, borderRadius: 15, backgroundColor: '#F0F4F8', justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: '#C4CDD5' },
+  fileBtnText: { fontSize: 11, fontWeight: '700', marginTop: 5, color: COLORS.primary },
+  preview: { height: 150, marginBottom: 20, borderRadius: 15, overflow: 'hidden', backgroundColor: '#F8F9FB', justifyContent: 'center', alignItems: 'center' },
+  img: { width: '100%', height: '100%' },
+  fileAttached: { fontSize: 12, color: COLORS.primary, fontWeight: '600' },
+  inputLabel: { fontSize: 11, fontWeight: '800', color: COLORS.primary, marginBottom: 5, marginLeft: 5 },
+  input: { backgroundColor: '#F8F9FB', borderRadius: 12, padding: 15, marginBottom: 15, borderWidth: 1, borderColor: '#CBD5E0', fontSize: 14, color: '#1A202C' },
+  switchBox: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, backgroundColor: '#F0F4F8', borderRadius: 12, marginBottom: 25 },
+  switchLabel: { fontSize: 10, fontWeight: '900', color: COLORS.primary },
+  dateDisplay: { fontSize: 14, color: '#2B6CB0', fontWeight: '800', marginTop: 4, textDecorationLine: 'underline' },
+  submit: { backgroundColor: '#00C853', padding: 20, borderRadius: 15, alignItems: 'center' },
+  submitText: { color: COLORS.white, fontWeight: '900', fontSize: 15, letterSpacing: 1 },
+  cancel: { padding: 20, alignItems: 'center', marginTop: 10 },
+  cancelText: { fontWeight: '900', color: '#E53E3E', fontSize: 15, textDecorationLine: 'underline' }
 });

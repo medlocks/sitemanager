@@ -62,4 +62,29 @@ describe('NotificationService', () => {
       is_read: false 
     });
   });
+
+  it('should notify managers by fetching profile IDs and inserting alerts', async () => {
+    const mockManagers = [{ id: 'mgr1' }, { id: 'mgr2' }];
+    
+    const selectManagersChain = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockResolvedValue({ data: mockManagers, error: null }),
+    };
+
+    const insertNotificationsChain = {
+      insert: jest.fn().mockResolvedValue({ error: null }),
+    };
+
+    (supabase.from as jest.Mock)
+      .mockReturnValueOnce(selectManagersChain)
+      .mockReturnValueOnce(insertNotificationsChain);
+
+    await notificationService.notifyManagers('TITLE', 'MESSAGE','WORK_ORDER', 'link123');
+
+    expect(selectManagersChain.eq).toHaveBeenCalledWith('role', 'Manager');
+    expect(insertNotificationsChain.insert).toHaveBeenCalledWith([
+      { recipient_id: 'mgr1', title: 'TITLE', message: 'MESSAGE', type: 'WORK_ORDER', link_id: 'link123', is_read: false },
+      { recipient_id: 'mgr2', title: 'TITLE', message: 'MESSAGE', type: 'WORK_ORDER', link_id: 'link123', is_read: false },
+    ]);
+  });
 });

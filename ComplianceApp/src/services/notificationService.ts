@@ -76,5 +76,31 @@ export const notificationService = {
       .update({ is_read: true })
       .match({ recipient_id: userId, is_read: false });
     if (error) throw error;
+  },
+
+  async notifyManagers(title: string, message: string, type: 'WORK_ORDER' | 'ACCIDENT' | 'HAZARD', linkId?: string) {
+  try {
+    const { data: managers } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'Manager');
+
+    if (!managers || managers.length === 0) return;
+
+    const notifications = managers.map(m => ({
+      recipient_id: m.id,
+      title,
+      message,
+      type, 
+      link_id: linkId,
+      is_read: false
+    }));
+
+    const { error } = await supabase.from('site_notifications').insert(notifications);
+    if (error) throw error;
+    
+  } catch (e) {
+    console.error("Error notifying managers:", e);
   }
+}
 };

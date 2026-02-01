@@ -49,21 +49,19 @@ export const incidentService = {
     const state = await NetInfo.fetch();
 
     if (!state.isConnected) {
-      // Note: If offline, we pass the local imageUri to the queue. 
-      // The syncService flusher must handle the file upload before the database insert.
       await syncService.enqueue('incidents', { ...dataToInsert, localImageUri: imageUri });
       return { offline: true };
     }
 
-    let publicUrl = null;
+    let imageUrl = null;
     if (imageUri) {
-      const fileName = `fault_${Date.now()}.jpg`;
-      publicUrl = await fileService.uploadFile('incident-evidence', fileName, imageUri);
+      // Logic Fix: uploadResult is now strictly a string (the path)
+      imageUrl = await fileService.uploadIncidentEvidence(userId || 'anon', imageUri);
     }
 
     const { data, error } = await supabase
       .from('incidents')
-      .insert([{ ...dataToInsert, image_url: publicUrl }])
+      .insert([{ ...dataToInsert, image_url: imageUrl }])
       .select()
       .single();
 

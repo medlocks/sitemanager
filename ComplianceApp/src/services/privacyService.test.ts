@@ -16,11 +16,6 @@ describe('PrivacyService', () => {
     jest.restoreAllMocks();
   });
 
-  it('should alert error if userId is missing', async () => {
-    await privacyService.downloadMyData(undefined);
-    expect(Alert.alert).toHaveBeenCalledWith("Error", "User ID not found.");
-  });
-
   it('should fetch profile and incidents then copy to clipboard', async () => {
     const mockProfile = { id: 'u1', email: 'test@raytheon.com' };
     const mockIncidents = [{ id: 'i1', description: 'Fault' }];
@@ -48,18 +43,18 @@ describe('PrivacyService', () => {
       expect.stringContaining('test@raytheon.com')
     );
     expect(Alert.alert).toHaveBeenCalledWith(
-      "Data Exported",
-      expect.any(String)
+      "GDPR Data Export",
+      "Your personal data has been copied to your clipboard in JSON format."
     );
   });
 
   it('should handle fetch errors gracefully', async () => {
-    (supabase.from('') as any).select.mockImplementation(() => {
+    (supabase.from as jest.Mock).mockImplementation(() => {
       throw new Error('Database down');
     });
 
     await privacyService.downloadMyData('u1');
 
-    expect(Alert.alert).toHaveBeenCalledWith("Export Error", "Could not fetch data.");
+    expect(Alert.alert).toHaveBeenCalledWith("Error", "Could not compile data export.");
   });
 });

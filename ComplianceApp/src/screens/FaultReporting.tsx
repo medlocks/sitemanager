@@ -9,13 +9,13 @@ import {
   Image, 
   TouchableOpacity, 
   ActivityIndicator,
-  TextStyle, 
-  ViewStyle, 
-  ImageStyle 
+  SafeAreaView
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { incidentService } from '../services/incidentService';
+import { notificationService } from '../services/notificationService';
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '../theme';
 
 export const FaultReporting = ({ navigation }: any) => {
@@ -58,12 +58,18 @@ export const FaultReporting = ({ navigation }: any) => {
         user?.id
       );
       
-      Alert.alert(
-        "Compliance Logged", 
-        "The report is now live in the central audit vault. Photo evidence is attached to the audit trail."
+      await notificationService.notifyManagers(
+        "NEW HAZARD REPORTED",
+        `A new hazard was logged at ${location} by ${user?.name}`,
+        "HAZARD"
       );
       
-      navigation.goBack();
+      Alert.alert(
+        "Compliance Logged", 
+        "The report is now live in the central audit vault.",
+        [{ text: "OK", onPress: () => navigation.goBack() }]
+      );
+
     } catch (error: any) {
       Alert.alert("Submission Error", error.message);
     } finally {
@@ -72,128 +78,113 @@ export const FaultReporting = ({ navigation }: any) => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Report a Fault or Hazard</Text>
-      <Text style={styles.subtitle}>Statutory Evidence Capture</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F4F7FA' }}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Report a Fault or Hazard</Text>
+          <Text style={styles.subtitle}>Statutory Evidence Capture</Text>
+        </View>
 
-      <Text style={styles.label}>Where is the issue?</Text>
-      <TextInput 
-        style={styles.input} 
-        placeholder="e.g. Mens Toilets, 2nd Floor" 
-        value={location}
-        onChangeText={setLocation}
-        placeholderTextColor={COLORS.textLight}
-      />
+        <View style={styles.formCard}>
+          <Text style={styles.label}>Where is the issue?</Text>
+          <TextInput 
+            style={styles.input} 
+            placeholder="e.g. Mens Toilets, 2nd Floor" 
+            value={location}
+            onChangeText={setLocation}
+            placeholderTextColor="#A0AEC0"
+          />
 
-      <Text style={styles.label}>Describe the fault</Text>
-      <TextInput 
-        style={[styles.input, { height: 100 }]} 
-        placeholder="e.g. Lights not working, leaking tap..." 
-        multiline
-        value={fault}
-        onChangeText={setFault}
-        textAlignVertical="top"
-        placeholderTextColor={COLORS.textLight}
-      />
+          <Text style={styles.label}>Describe the fault</Text>
+          <TextInput 
+            style={[styles.input, { height: 120 }]} 
+            placeholder="e.g. Lights not working, leaking tap..." 
+            multiline
+            value={fault}
+            onChangeText={setFault}
+            textAlignVertical="top"
+            placeholderTextColor="#A0AEC0"
+          />
 
-      <TouchableOpacity style={styles.photoBtn} onPress={takePhoto} disabled={loading}>
-        <Text style={styles.photoBtnText}>
-          {image ? "✅ PHOTO ATTACHED" : "📸 ATTACH PHOTO EVIDENCE"}
-        </Text>
-      </TouchableOpacity>
+          <TouchableOpacity style={styles.photoBtn} onPress={takePhoto} disabled={loading}>
+            <Ionicons name="camera" size={24} color={COLORS.primary} style={{ marginBottom: 5 }} />
+            <Text style={styles.photoBtnText}>
+              {image ? "PHOTO EVIDENCE ATTACHED" : "ATTACH PHOTO EVIDENCE"}
+            </Text>
+          </TouchableOpacity>
 
-      {image && (
-        <View style={styles.previewContainer}>
-          <Image source={{ uri: image }} style={styles.preview} />
-          <TouchableOpacity onPress={() => setImage(null)} disabled={loading}>
-            <Text style={styles.removePhoto}>Remove Photo</Text>
+          {image && (
+            <View style={styles.previewContainer}>
+              <Image source={{ uri: image }} style={styles.preview} />
+              <TouchableOpacity onPress={() => setImage(null)} disabled={loading} style={styles.removeBtn}>
+                <Ionicons name="trash-outline" size={16} color={COLORS.secondary} />
+                <Text style={styles.removePhoto}>Remove Photo</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <TouchableOpacity 
+            style={[styles.submitBtn, loading && { backgroundColor: COLORS.lightGray }]} 
+            onPress={submitFault} 
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <Text style={styles.btnText}>Submit Report to Live Vault</Text>
+            )}
           </TouchableOpacity>
         </View>
-      )}
-
-      <TouchableOpacity 
-        style={[styles.submitBtn, loading && { backgroundColor: COLORS.gray }]} 
-        onPress={submitFault} 
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color={COLORS.white} />
-        ) : (
-          <Text style={styles.btnText}>Submit Report to Live Vault</Text>
-        )}
-      </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    padding: SPACING.l, 
-    backgroundColor: COLORS.white 
-  } as ViewStyle,
-  title: { 
-    ...TYPOGRAPHY.header, 
-    color: COLORS.primary 
-  } as TextStyle,
-  subtitle: { 
-    ...TYPOGRAPHY.caption, 
-    fontSize: 12, 
-    marginBottom: SPACING.xl 
-  } as TextStyle,
-  label: { 
-    ...TYPOGRAPHY.body, 
-    fontWeight: 'bold', 
-    marginBottom: SPACING.xs, 
-    color: COLORS.text 
-  } as TextStyle,
+  content: { padding: 20 },
+  header: { marginBottom: 25 },
+  title: { ...TYPOGRAPHY.header, color: COLORS.primary, fontSize: 22 },
+  subtitle: { ...TYPOGRAPHY.caption, color: COLORS.textLight, marginTop: 4 },
+  formCard: {
+    backgroundColor: COLORS.white,
+    padding: 20,
+    borderRadius: 16,
+    ...SHADOWS.light,
+    borderWidth: 1,
+    borderColor: '#E1E6ED'
+  },
+  label: { fontSize: 13, fontWeight: '700', marginBottom: 8, color: COLORS.primary },
   input: { 
+    backgroundColor: '#F8F9FB',
     borderWidth: 1, 
-    borderColor: COLORS.lightGray, 
-    borderRadius: 8, 
-    padding: SPACING.s, 
-    marginBottom: SPACING.l,
+    borderColor: '#E1E6ED', 
+    borderRadius: 12, 
+    padding: 15, 
+    marginBottom: 20,
     color: COLORS.text,
-    backgroundColor: COLORS.background 
-  } as ViewStyle,
+    fontSize: 15
+  },
   photoBtn: { 
-    backgroundColor: COLORS.background, 
-    padding: SPACING.m, 
-    borderRadius: 8, 
+    backgroundColor: '#F0F4F8', 
+    padding: 20, 
+    borderRadius: 12, 
     borderStyle: 'dashed', 
-    borderWidth: 2, 
+    borderWidth: 1, 
     borderColor: COLORS.primary, 
     alignItems: 'center', 
-    marginBottom: SPACING.l 
-  } as ViewStyle,
-  photoBtnText: { 
-    color: COLORS.primary, 
-    fontWeight: 'bold' 
-  } as TextStyle,
-  previewContainer: { 
-    alignItems: 'center', 
-    marginBottom: SPACING.l 
-  } as ViewStyle,
-  preview: { 
-    width: '100%', 
-    height: 200, 
-    borderRadius: 8,
-    ...SHADOWS.light
-  } as ImageStyle,
-  removePhoto: { 
-    color: COLORS.secondary, 
-    marginTop: SPACING.s, 
-    fontWeight: 'bold' 
-  } as TextStyle,
+    marginBottom: 20 
+  },
+  photoBtnText: { color: COLORS.primary, fontWeight: '800', fontSize: 12 },
+  previewContainer: { alignItems: 'center', marginBottom: 20 },
+  preview: { width: '100%', height: 200, borderRadius: 12 },
+  removeBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 5 },
+  removePhoto: { color: COLORS.secondary, fontWeight: '700', fontSize: 13 },
   submitBtn: { 
     backgroundColor: COLORS.primary, 
-    padding: SPACING.m, 
-    borderRadius: 8, 
+    padding: 18, 
+    borderRadius: 12, 
     alignItems: 'center',
-    marginBottom: SPACING.xl
-  } as ViewStyle,
-  btnText: { 
-    color: COLORS.white, 
-    fontWeight: 'bold' 
-  } as TextStyle
+    marginTop: 10
+  },
+  btnText: { color: COLORS.white, fontWeight: '800', fontSize: 16 }
 });

@@ -1,284 +1,210 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, 
-  ActivityIndicator, Modal, ScrollView, Image, SafeAreaView 
-} from 'react-native';
-import { supabase } from '../lib/supabase';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { incidentService, Incident } from '../services/incidentService';
-import { notificationService } from '../services/notificationService';
+import { supabase } from '../lib/supabase';
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '../theme';
 
 export const Dashboard = ({ navigation }: any) => {
   const { user } = useAuth();
-  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [feed, setFeed] = useState<any[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [detailVisible, setDetailVisible] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
 
-  const loadData = async () => {
+  const isManager = user?.role === 'Manager';
+
+  const fetchData = async () => {
+    if (!isManager) {
+      setLoading(false);
+      return;
+    }
+    
     try {
-      setLoading(true);
-      const [incidentData, notifications] = await Promise.all([
-        incidentService.getIncidents(),
-        notificationService.getNotificationLog(user?.id || '')
+      const [feedRes, countRes] = await Promise.all([
+        supabase.from('incidents').select('*').order('created_at', { ascending: false }).limit(8),
+        supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('status', 'Pending')
       ]);
-      setIncidents(incidentData);
-      if (notifications){
-      setUnreadCount(notifications.filter((n: any) => !n.is_read).length);
-      }
-    } catch (e: any) {
-      Alert.alert("Sync Error", "Could not fetch live dashboard data.");
+      setFeed(feedRes.data || []);
+      setPendingCount(countRes.count || 0);
+    } catch (error) {
+      console.error("Dashboard Fetch Error:", error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('Notifications')} 
-          style={styles.notifBadgeContainer}
-        >
-          <Text style={styles.notifIcon}>🔔</Text>
-          {unreadCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation, unreadCount]);
+    fetchData();
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', loadData);
+    if (isManager) {
+      // 1. Create a unique channel for this dashboard
+      const channel = supabase.channel('realtime_incidents')
+        .on(
+          'postgres_changes', 
+          { event: '*', schema: 'public', table: 'incidents' }, 
+          (payload) => {
+            // 2. Tactical state updates for "Live" feel
+            if (payload.eventType === 'INSERT') {
+              setFeed(prev => [payload.new, ...prev].slice(0, 8));
+              if (payload.new.status === 'Pending') setPendingCount(c => c + 1);
+            } 
+            else if (payload.eventType === 'UPDATE') {
+              setFeed(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
+              // Refresh counts globally on update to ensure accuracy
+              fetchData(); 
+            }
+            else if (payload.eventType === 'DELETE') {
+              setFeed(prev => prev.filter(item => item.id !== payload.old.id));
+              fetchData();
+            }
+          }
+        )
+        .subscribe();
 
-    const channel = supabase
-      .channel('db_changes_dash')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_notifications' }, () => loadData())
-      .subscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [isManager]);
 
-    return () => {
-      unsubscribe();
-      supabase.removeChannel(channel);
-    };
-  }, [navigation, user]);
+  const menuItems = [
+    { id: '1', title: 'Report Fault / Hazard', icon: 'alert-circle-outline', screen: 'FaultReporting', roles: ['Manager', 'Employee'] },
+    { id: '2', title: 'Log Statutory Accident', icon: 'medical-outline', screen: 'LogAccident', roles: ['Manager', 'Employee'] },
+    { id: '3', title: 'Building Assets', icon: 'construct-outline', screen: 'BuildingServices', roles: ['Manager'] },
+    { id: '4', title: 'Audit Evidence', icon: 'shield-checkmark-outline', screen: 'AuditReport', roles: ['Manager'] },
+    { id: '5', title: 'Specialist Verification', icon: 'people-outline', screen: 'QualificationTracker', roles: ['Manager'] },
+    { id: '6', title: 'Security Protocols', icon: 'options-outline', screen: 'SiteSettings', roles: ['Manager'] },
+  ];
 
-  const stats = {
-    pending: incidents.filter(i => i.status === 'Pending').length,
-    assigned: incidents.filter(i => i.status === 'Assigned').length,
-    resolved: incidents.filter(i => i.status === 'Resolved').length,
-  };
-
-  const openDetails = (item: Incident) => {
-    setSelectedTask(item);
-    setDetailVisible(true);
-  };
-
-  const renderItem = ({ item }: { item: Incident }) => {
-    const isPlanned = item.type === 'Planned';
-    const statusColor = item.status === 'Resolved' ? COLORS.success : (isPlanned ? COLORS.secondary : COLORS.warning);
-
-    return (
-      <TouchableOpacity 
-        style={[styles.card, { borderLeftColor: statusColor }]}
-        onPress={() => openDetails(item)}
-      >
-        <View style={styles.cardHeader}>
-          <Text style={styles.timestamp}>{new Date(item.created_at).toLocaleDateString()}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-             <Text style={styles.statusBadgeText}>{isPlanned && item.status !== 'Resolved' ? 'PLANNED' : item.status}</Text>
-          </View>
-        </View>
-        <Text style={styles.desc}>{item.description}</Text>
-        <View style={styles.cardFooter}>
-          <Text style={styles.meta}>📍 {item.location}</Text>
-          <Text style={styles.viewLink}>VIEW RECORD →</Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const filteredItems = menuItems.filter(item => item.roles.includes(user?.role || ''));
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        <Text style={styles.header}>Raytheon Command Center</Text>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.hero}>
+          <Text style={styles.greeting}>ACCESS LEVEL: {user?.role}</Text>
+          <Text style={styles.name}>{user?.name}</Text>
+        </View>
+        
+        {isManager && pendingCount > 0 && (
+          <TouchableOpacity 
+            style={styles.summaryBanner}
+            onPress={() => navigation.navigate('AuditReport')}
+          >
+            <Ionicons name="notifications" size={20} color={COLORS.white} />
+            <Text style={styles.summaryText}>
+              ACTION REQUIRED: {pendingCount} PENDING TASKS
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.white} style={{marginLeft: 'auto'}} />
+          </TouchableOpacity>
+        )}
 
-        <View style={styles.statsContainer}>
-          <View style={[styles.statBox, { backgroundColor: COLORS.warning }]}>
-            <Text style={styles.statNum}>{stats.pending}</Text>
-            <Text style={styles.statLabel}>Pending</Text>
-          </View>
-          <View style={[styles.statBox, { backgroundColor: COLORS.secondary }]}>
-            <Text style={styles.statNum}>{stats.assigned}</Text>
-            <Text style={styles.statLabel}>Assigned</Text>
-          </View>
-          <View style={[styles.statBox, { backgroundColor: COLORS.success }]}>
-            <Text style={styles.statNum}>{stats.resolved}</Text>
-            <Text style={styles.statLabel}>Resolved</Text>
-          </View>
+        <View style={styles.grid}>
+          {filteredItems.map((item) => (
+            <TouchableOpacity 
+              key={item.id} 
+              style={styles.card} 
+              onPress={() => navigation.navigate(item.screen)}
+            >
+              <View style={styles.iconBox}>
+                <Ionicons name={item.icon as any} size={24} color={COLORS.primary} />
+              </View>
+              <Text style={styles.cardText}>{item.title}</Text>
+              <Ionicons name="chevron-forward" size={18} color="#C4CDD5" />
+            </TouchableOpacity>
+          ))}
         </View>
 
-        <TouchableOpacity style={styles.faultBtn} onPress={() => navigation.navigate('FaultReporting')}>
-          <Text style={styles.faultBtnText}>⚠️ REPORT NEW FAULT / HAZARD</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.accidentBtn} onPress={() => navigation.navigate('LogAccident')}>
-          <Text style={styles.accidentBtnText}>🚨 LOG WORKPLACE ACCIDENT</Text>
-        </TouchableOpacity>
-
-        {user?.role === 'Manager' && (
-          <View style={styles.governanceSection}>
-            <Text style={styles.subHeader}>Governance & Statutory Tools</Text>
-            <View style={styles.grid}>
-              <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('BuildingServices')}>
-                <Text style={styles.gridLabel}>Asset Register</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('AuditReport')}>
-                <Text style={styles.gridLabel}>Audit Vault</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('QualificationTracker')}>
-                <Text style={styles.gridLabel}>Specialists</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.gridItem, { backgroundColor: COLORS.secondary }]} onPress={() => navigation.navigate('SiteSettings')}>
-                <Text style={styles.gridLabel}>Security Config</Text>
-              </TouchableOpacity>
+        {isManager && (
+          <View style={styles.feedSection}>
+            <View style={styles.feedHeader}>
+              <Text style={styles.feedTitle}>LIVE INCIDENT FEED</Text>
+              <View style={styles.pulseDot} />
             </View>
+
+            {loading ? (
+              <ActivityIndicator color={COLORS.primary} style={{ marginTop: 20 }} />
+            ) : feed.map((item) => (
+              <TouchableOpacity 
+                key={item.id} 
+                style={styles.feedItem}
+                onPress={() => navigation.navigate('IncidentDetail', { incident: item })}
+              >
+                <View style={[styles.statusLine, { backgroundColor: item.status === 'Resolved' ? '#00C853' : '#FFAB00' }]} />
+                <View style={styles.feedContent}>
+                  <View style={styles.feedTopRow}>
+                    <Text style={styles.feedDesc} numberOfLines={1}>{item.description}</Text>
+                    <Text style={[styles.statusTag, { color: item.status === 'Resolved' ? '#00C853' : '#FFAB00' }]}>
+                      {item.status.toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.feedMeta}>
+                    {item.location} • {new Date(item.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                  </Text>
+                </View>
+                <Ionicons name="eye-outline" size={18} color="#C4CDD5" style={{marginLeft: 10}} />
+              </TouchableOpacity>
+            ))}
+            {!loading && feed.length === 0 && (
+              <Text style={styles.emptyText}>No recent site activity.</Text>
+            )}
           </View>
         )}
-
-        <Text style={styles.subHeader}>Live Incident Feed</Text>
-        {loading ? (
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        ) : (
-          <FlatList 
-            data={incidents}
-            keyExtractor={(item) => item.id}
-            renderItem={renderItem}
-            scrollEnabled={false}
-            ListEmptyComponent={<Text style={styles.emptyText}>No active incidents.</Text>}
-          />
-        )}
       </ScrollView>
-
-      <Modal visible={detailVisible} animationType="slide">
-        <SafeAreaView style={styles.modalContent}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalTitle}>Statutory Record</Text>
-              <TouchableOpacity onPress={() => setDetailVisible(false)}>
-                <Text style={styles.closeText}>CLOSE</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.detailRow}>
-               <View style={styles.infoBlock}>
-                 <Text style={styles.infoLabel}>STATUS</Text>
-                 <Text style={[styles.infoVal, {color: COLORS.primary}]}>{selectedTask?.status}</Text>
-               </View>
-               <View style={styles.infoBlock}>
-                 <Text style={styles.infoLabel}>TASK TYPE</Text>
-                 <Text style={styles.infoVal}>{selectedTask?.type || 'Reactive'}</Text>
-               </View>
-            </View>
-
-            <Text style={styles.infoLabel}>DESCRIPTION</Text>
-            <Text style={styles.bigDesc}>{selectedTask?.description}</Text>
-
-            <Text style={styles.infoLabel}>LOCATION</Text>
-            <Text style={styles.infoVal}>{selectedTask?.location}</Text>
-
-            <View style={styles.divider} />
-
-            {selectedTask?.status === 'Resolved' ? (
-              <View>
-                <Text style={styles.sectionHeader}>✓ Compliance Evidence</Text>
-                
-                <Text style={styles.infoLabel}>POST-WORK IMAGE</Text>
-                {selectedTask?.resolved_image_url ? (
-                  <Image source={{ uri: selectedTask.resolved_image_url }} style={styles.evidenceImage} />
-                ) : (
-                  <View style={styles.noImage}><Text>No Evidence Image Uploaded</Text></View>
-                )}
-
-                <Text style={styles.infoLabel}>RESOLUTION NOTES</Text>
-                <Text style={styles.notesBox}>{selectedTask?.resolution_notes}</Text>
-
-                <Text style={styles.infoLabel}>REMEDIAL ACTIONS TAKEN</Text>
-                <Text style={styles.notesBox}>{selectedTask?.remedial_actions || 'No further actions required.'}</Text>
-
-                <Text style={styles.infoLabel}>LEGALLY SIGNED BY</Text>
-                <Text style={styles.signatureName}>{selectedTask?.signed_off_by || 'Verified User'}</Text>
-                <Text style={styles.timestamp}>Resolved at: {selectedTask?.resolved_at ? new Date(selectedTask.resolved_at).toLocaleString() : 'N/A'}</Text>
-              </View>
-            ) : (
-              user?.role === 'Manager' && (
-                <TouchableOpacity 
-                  style={styles.assignActionBtn}
-                  onPress={() => {
-                    setDetailVisible(false);
-                    navigation.navigate('ContractorAssignment', { incidentId: selectedTask?.id });
-                  }}
-                >
-                  <Text style={styles.assignActionText}>ASSIGN COMPETENT SPECIALIST</Text>
-                </TouchableOpacity>
-              )
-            )}
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: { ...TYPOGRAPHY.header, textAlign: 'center', marginVertical: 20, color: COLORS.primary },
-  notifBadgeContainer: { marginRight: 20, position: 'relative' },
-  notifIcon: { fontSize: 22 },
-  badge: { position: 'absolute', right: -6, top: -4, backgroundColor: COLORS.secondary, borderRadius: 10, width: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.white },
-  badgeText: { color: COLORS.white, fontSize: 10, fontWeight: 'bold' },
-  statsContainer: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: SPACING.m, marginBottom: 20 },
-  statBox: { flex: 0.31, padding: 10, borderRadius: 10, alignItems: 'center', ...SHADOWS.light },
-  statNum: { fontSize: 22, fontWeight: 'bold', color: COLORS.white },
-  statLabel: { fontSize: 10, color: COLORS.white, fontWeight: 'bold', textTransform: 'uppercase' },
-  faultBtn: { backgroundColor: COLORS.white, marginHorizontal: SPACING.m, padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 12, borderWidth: 2, borderColor: COLORS.warning, ...SHADOWS.light },
-  faultBtnText: { fontWeight: 'bold', color: COLORS.text },
-  accidentBtn: { backgroundColor: COLORS.secondary, marginHorizontal: SPACING.m, padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 25, ...SHADOWS.light },
-  accidentBtnText: { fontWeight: 'bold', color: COLORS.white },
-  governanceSection: { paddingHorizontal: SPACING.m, marginBottom: 10 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  gridItem: { width: '48%', backgroundColor: COLORS.primary, padding: 15, borderRadius: 10, marginBottom: 12, alignItems: 'center', ...SHADOWS.light },
-  gridLabel: { color: COLORS.white, fontSize: 12, fontWeight: 'bold' },
-  subHeader: { fontSize: 12, fontWeight: 'bold', color: COLORS.gray, marginBottom: 15, textTransform: 'uppercase', letterSpacing: 1, paddingHorizontal: SPACING.m },
-  card: { backgroundColor: COLORS.white, marginHorizontal: SPACING.m, padding: 15, borderRadius: 12, marginBottom: 12, borderLeftWidth: 6, ...SHADOWS.light },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
-  timestamp: { fontSize: 10, color: COLORS.gray, fontWeight: '600' },
-  statusBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  statusBadgeText: { fontSize: 9, fontWeight: 'bold', color: COLORS.white },
-  desc: { fontWeight: 'bold', fontSize: 15, color: COLORS.text, marginVertical: 5 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  meta: { fontSize: 11, color: COLORS.gray },
-  viewLink: { fontSize: 11, fontWeight: 'bold', color: COLORS.primary },
-  emptyText: { textAlign: 'center', marginTop: 20, color: COLORS.gray, paddingHorizontal: 20 },
-  modalContent: { flex: 1, padding: 25, backgroundColor: COLORS.white },
-  modalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
-  modalTitle: { fontSize: 24, fontWeight: 'bold', color: COLORS.primary },
-  closeText: { fontWeight: 'bold', color: COLORS.gray },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  infoBlock: { flex: 0.45 },
-  infoLabel: { fontSize: 10, fontWeight: 'bold', color: COLORS.gray, marginBottom: 5, letterSpacing: 0.5 },
-  infoVal: { fontSize: 15, fontWeight: '600' },
-  bigDesc: { fontSize: 20, fontWeight: 'bold', marginBottom: 20 },
-  divider: { height: 1, backgroundColor: '#f0f0f0', marginVertical: 20 },
-  sectionHeader: { fontSize: 18, fontWeight: 'bold', color: COLORS.success, marginBottom: 20 },
-  evidenceImage: { width: '100%', height: 250, borderRadius: 15, marginBottom: 20 },
-  noImage: { width: '100%', height: 120, backgroundColor: '#f9f9f9', justifyContent: 'center', alignItems: 'center', borderRadius: 15, borderColor: '#eee' },
-  notesBox: { backgroundColor: '#f7f7f7', padding: 15, borderRadius: 10, marginBottom: 20, fontSize: 14, color: COLORS.text, lineHeight: 20 },
-  signatureName: { fontSize: 20, fontStyle: 'italic', color: COLORS.primary, fontWeight: 'bold', marginTop: 5 },
-  assignActionBtn: { backgroundColor: COLORS.primary, padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 10 },
-  assignActionText: { color: COLORS.white, fontWeight: 'bold', fontSize: 16 }
+  container: { flex: 1, backgroundColor: '#F4F7FA' },
+  content: { padding: SPACING.m },
+  hero: { marginBottom: 20, paddingLeft: 5 },
+  greeting: { fontSize: 11, fontWeight: '800', color: COLORS.secondary, letterSpacing: 1.5 },
+  name: { ...TYPOGRAPHY.header, fontSize: 26, color: COLORS.primary, marginTop: 4 },
+  summaryBanner: {
+    backgroundColor: COLORS.secondary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 10,
+    ...SHADOWS.light
+  },
+  summaryText: { color: COLORS.white, fontWeight: '800', fontSize: 12, letterSpacing: 0.5 },
+  grid: { gap: 10, marginBottom: 30 },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    ...SHADOWS.light,
+    borderWidth: 1,
+    borderColor: '#E1E6ED'
+  },
+  iconBox: { width: 44, height: 44, backgroundColor: '#F0F4F8', borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  cardText: { flex: 1, fontSize: 14, fontWeight: '700', color: COLORS.primary },
+  feedSection: { marginTop: 10 },
+  feedHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 15, gap: 8, paddingLeft: 5 },
+  feedTitle: { fontSize: 12, fontWeight: '900', color: COLORS.primary, letterSpacing: 1 },
+  pulseDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF4D4F' },
+  feedItem: {
+    backgroundColor: COLORS.white,
+    padding: 15,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    ...SHADOWS.light,
+    borderWidth: 1,
+    borderColor: '#E1E6ED'
+  },
+  statusLine: { width: 4, height: 40, borderRadius: 2, marginRight: 12 },
+  feedContent: { flex: 1 },
+  feedTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  feedDesc: { fontSize: 13, fontWeight: '700', color: COLORS.primary, flex: 0.75 },
+  feedMeta: { fontSize: 11, color: COLORS.textLight, marginTop: 2 },
+  statusTag: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  emptyText: { textAlign: 'center', color: COLORS.lightGray, marginTop: 20, fontSize: 12 }
 });

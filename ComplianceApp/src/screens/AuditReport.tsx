@@ -4,7 +4,9 @@ import {
   FlatList, ActivityIndicator, Alert, SafeAreaView, TextInput, Modal, Dimensions, Linking, Image 
 } from 'react-native';
 import { BarChart } from "react-native-chart-kit";
+import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { supabase } from '../lib/supabase';
 import { auditService } from '../services/auditService';
 import { accidentService } from '../services/accidentService';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING } from '../theme';
@@ -19,10 +21,15 @@ export const AuditReport = () => {
   const [accidents, setAccidents] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   
   const [fromDate, setFromDate] = useState(new Date(new Date().setMonth(new Date().getMonth() - 1)));
   const [toDate, setToDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState<'from' | 'to' | null>(null);
+
+  const [evidenceUri, setEvidenceUri] = useState<string | null>(null);
+  const [loadingImg, setLoadingImg] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -39,29 +46,79 @@ export const AuditReport = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  const fetchAssetHistory = async (assetId: string) => {
+    try {
+      setLoadingHistory(true);
+      const { data, error } = await supabase
+        .from('maintenance_logs')
+        .select('*')
+        .eq('asset_id', assetId)
+        .order('service_date', { ascending: false });
 
-  const handleExport = async () => {
-    const isAsset = viewMode === 'Assets';
-    const isAccident = viewMode === 'Accidents';
-    let dataToExport = [];
-    let title = "";
-
-    if (isAsset) {
-      dataToExport = assets;
-      title = "Statutory Asset Register";
-    } else if (isAccident) {
-      dataToExport = filteredAccidents;
-      title = `Accident Logbook (${fromDate.toLocaleDateString()} - ${toDate.toLocaleDateString()})`;
-    } else {
-      dataToExport = filteredIncidents;
-      title = `Incident Audit Trail (${fromDate.toLocaleDateString()} - ${toDate.toLocaleDateString()})`;
+      if (error) throw error;
+      setHistory(data || []);
+    } catch (e: any) {
+      console.error("History Error:", e.message);
+    } finally {
+      setLoadingHistory(false);
     }
-
-    await auditService.generateAuditPDF(title, dataToExport, isAsset);
   };
 
-  // --- FILTER LOGIC ---
+  useEffect(() => { fetchData(); }, []);
+
+  useEffect(() => {
+    if (selectedItem) {
+      resolveEvidence(selectedItem);
+      if (viewMode === 'Assets') {
+        fetchAssetHistory(selectedItem.id);
+      }
+    } else {
+      setEvidenceUri(null);
+      setHistory([]);
+    }
+  }, [selectedItem]);
+
+  const resolveEvidence = (item: any) => {
+    setLoadingImg(true);
+    const rawPath = item.image_url || item.evidence_url || item.resolved_image_url || item.certificate_url;
+    
+    if (rawPath && !rawPath.startsWith('file://')) {
+      if (rawPath.startsWith('http')) {
+        setEvidenceUri(rawPath);
+        setLoadingImg(false);
+      } else {
+        const { data } = supabase.storage
+          .from('incident-evidence')
+          .getPublicUrl(rawPath);
+        
+        if (data?.publicUrl) {
+          setEvidenceUri(`${data.publicUrl}?t=${new Date().getTime()}`);
+        }
+        setLoadingImg(false);
+      }
+    } else {
+      setEvidenceUri(null);
+      setLoadingImg(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'PENDING';
+    return new Date(dateString).toLocaleString('en-GB', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  };
+
+  const openEvidence = (url?: string) => {
+    const targetUrl = url || evidenceUri;
+    if (targetUrl) {
+      Linking.openURL(targetUrl).catch(() => {
+        Alert.alert("Error", "Unable to open evidence file.");
+      });
+    }
+  };
+
   const filteredIncidents = incidents.filter(item => {
     const itemDate = new Date(item.created_at);
     return itemDate >= fromDate && itemDate <= toDate && 
@@ -79,30 +136,25 @@ export const AuditReport = () => {
     (item.location || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // --- CHART DATA GENERATION ---
   const incidentChartData = auditService.getMonthlyTrend(filteredIncidents);
   const accidentChartData = auditService.getMonthlyTrend(filteredAccidents.map(a => ({...a, created_at: a.date_time})));
 
   const renderItem = ({ item }: { item: any }) => {
     const isAsset = viewMode === 'Assets';
     const isAccident = viewMode === 'Accidents';
-    const statusColor = (item.status === 'Resolved' || item.status === 'Compliant') ? COLORS.success : COLORS.secondary;
+    const statusColor = (item.status === 'Resolved' || item.status === 'Compliant') ? '#00C853' : '#FFAB00';
     
     return (
       <TouchableOpacity style={styles.logCard} onPress={() => setSelectedItem(item)}>
         <View style={styles.logHeader}>
           <Text style={styles.logDate}>
-            {isAccident ? new Date(item.date_time).toLocaleDateString('en-GB') : 
+            {isAccident ? formatDate(item.date_time) : 
              isAsset ? `NEXT DUE: ${item.next_service_due}` : 
-             new Date(item.created_at).toLocaleDateString('en-GB')}
+             formatDate(item.created_at)}
           </Text>
-          {isAccident ? (
-            item.is_riddor_reportable && <View style={styles.riddorBadge}><Text style={styles.riddorText}>RIDDOR</Text></View>
-          ) : (
-            <View style={[styles.pill, {backgroundColor: statusColor}]}>
-               <Text style={styles.pillTxt}>{item.status?.toUpperCase()}</Text>
-            </View>
-          )}
+          <View style={[styles.pill, {backgroundColor: statusColor}]}>
+             <Text style={styles.pillTxt}>{item.status?.toUpperCase() || (isAccident ? 'LOGGED' : 'PENDING')}</Text>
+          </View>
         </View>
         <Text style={styles.logDesc}>
             {isAccident ? `Injured: ${item.injured_person_name}` : isAsset ? item.asset_name : item.description}
@@ -131,7 +183,7 @@ export const AuditReport = () => {
         </ScrollView>
       </View>
 
-      {viewMode !== 'Assets' && (
+      {viewMode !== 'Assets' && viewMode !== 'Analytics' && (
         <View style={styles.filterBar}>
           <TouchableOpacity style={styles.dateBtn} onPress={() => setShowPicker('from')}>
             <Text style={styles.dateBtnLabel}>FROM</Text>
@@ -163,17 +215,14 @@ export const AuditReport = () => {
           {viewMode === 'Analytics' ? (
             <ScrollView style={{padding: 20}}>
               <Text style={styles.sectionTitle}>Incident Volume (Faults/Hazards)</Text>
-              
               <BarChart
                 data={{ labels: incidentChartData.labels, datasets: [{ data: incidentChartData.values }] }}
                 width={screenWidth - 40} height={200}
                 yAxisLabel="" yAxisSuffix=""
                 chartConfig={chartConfig} style={styles.chartStyle} fromZero
               />
-              
               <View style={{marginTop: 30}}>
                 <Text style={[styles.sectionTitle, {color: COLORS.secondary}]}>Accident Volume (HSE Logbook)</Text>
-                
                 <BarChart
                     data={{ labels: accidentChartData.labels, datasets: [{ data: accidentChartData.values }] }}
                     width={screenWidth - 40} height={200}
@@ -190,21 +239,21 @@ export const AuditReport = () => {
                 placeholder={`Search ${viewMode}...`} 
                 value={searchQuery} 
                 onChangeText={setSearchQuery} 
+                placeholderTextColor={COLORS.textLight}
               />
               <FlatList
                 data={viewMode === 'Assets' ? filteredAssets : viewMode === 'Accidents' ? filteredAccidents : filteredIncidents}
                 keyExtractor={item => item.id}
                 renderItem={renderItem}
-                ListEmptyComponent={<Text style={styles.emptyTxt}>No records found.</Text>}
+                ListEmptyComponent={<Text style={styles.emptyTxt}>No statutory records found.</Text>}
               />
             </View>
           )}
         </View>
       )}
 
-      {/* COMPREHENSIVE DRILL-DOWN MODAL */}
       <Modal visible={!!selectedItem} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={{flex: 1, backgroundColor: '#fff'}}>
+        <SafeAreaView style={{flex: 1, backgroundColor: '#F4F7FA'}}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Statutory Record Detail</Text>
             <TouchableOpacity onPress={() => setSelectedItem(null)}>
@@ -212,75 +261,157 @@ export const AuditReport = () => {
             </TouchableOpacity>
           </View>
           
-          <ScrollView style={styles.modalScroll}>
-            <View style={styles.detailCard}>
-              <Text style={styles.detailLabel}>ITEM / PERSON</Text>
-              <Text style={styles.detailVal}>{selectedItem?.asset_name || selectedItem?.description || selectedItem?.injured_person_name}</Text>
-              
-              <Text style={styles.detailLabel}>LOCATION</Text>
-              <Text style={styles.detailVal}>{selectedItem?.location || 'Not Specified'}</Text>
-
-              <View style={styles.detailRow}>
-                   <View style={{ flex: 1 }}>
-                     <Text style={styles.detailLabel}>LOGGED DATE</Text>
-                     <Text style={styles.detailVal}>
-                        {selectedItem?.date_time ? new Date(selectedItem.date_time).toLocaleDateString('en-GB') : new Date(selectedItem?.created_at).toLocaleDateString('en-GB')}
-                     </Text>
-                   </View>
-                   <View style={{ flex: 1 }}>
-                     <Text style={styles.detailLabel}>TIME</Text>
-                     <Text style={styles.detailVal}>
-                        {new Date(selectedItem?.date_time || selectedItem?.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                     </Text>
-                   </View>
+          <ScrollView contentContainerStyle={{ padding: 20 }}>
+            {/* TIMELINE SECTION */}
+            <View style={styles.detailSection}>
+              <Text style={styles.label}>STATUTORY AUDIT TIMELINE</Text>
+              <View style={styles.timelineItem}>
+                <Ionicons name="radio-button-on" size={14} color={COLORS.secondary} />
+                <View style={styles.timeInfo}>
+                  <Text style={styles.timeLabel}>LOGGED / CREATED</Text>
+                  <Text style={styles.timeValue}>{formatDate(selectedItem?.created_at || selectedItem?.date_time)}</Text>
+                </View>
               </View>
+              
+              {(selectedItem?.status === 'Resolved' || selectedItem?.status === 'Compliant') && (
+                <View style={[styles.timelineItem, { marginTop: 15 }]}>
+                  <Ionicons name="checkmark-circle" size={14} color="#00C853" />
+                  <View style={styles.timeInfo}>
+                    <Text style={styles.timeLabel}>VERIFIED & SIGNED OFF</Text>
+                    <Text style={styles.timeValue}>{formatDate(selectedItem?.resolved_at || selectedItem?.last_service)}</Text>
+                  </View>
+                </View>
+              )}
             </View>
 
-            {/* ACCIDENT SPECIFIC DETAILS */}
-            {selectedItem?.injured_person_name && (
-                <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>INJURY & TREATMENT DETAILS</Text>
-                    <Text style={styles.metaLabel}>Injury Description</Text>
-                    <Text style={styles.notesBox}>{selectedItem.injury_description}</Text>
-                    <Text style={styles.metaLabel}>Treatment Given</Text>
-                    <Text style={styles.notesBox}>{selectedItem.treatment_given || 'None'}</Text>
-                    <Text style={styles.metaLabel}>RIDDOR Reportable</Text>
-                    <Text style={[styles.detailVal, {color: selectedItem.is_riddor_reportable ? 'red' : 'green'}]}>
-                        {selectedItem.is_riddor_reportable ? 'YES - ACTION REQUIRED' : 'NO'}
-                    </Text>
-                </View>
-            )}
+            {/* CORE DATA */}
+            <View style={styles.detailSection}>
+              <Text style={styles.label}>CORE DETAILS</Text>
+              <Text style={styles.value}>{selectedItem?.asset_name || selectedItem?.description || selectedItem?.injured_person_name}</Text>
+              <View style={styles.locationRow}>
+                <Ionicons name="location" size={14} color={COLORS.textLight} />
+                <Text style={styles.locationText}>{selectedItem?.location || 'Not Specified'}</Text>
+              </View>
+              {selectedItem?.next_service_due && (
+                <Text style={[styles.auditMeta, { marginTop: 10, color: COLORS.secondary }]}>
+                  NEXT STATUTORY DUE: {selectedItem.next_service_due}
+                </Text>
+              )}
+            </View>
 
-            {/* ASSET SPECIFIC DETAILS */}
-            {selectedItem?.asset_name && (
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>STATUTORY INFO</Text>
-                <View style={styles.detailRow}>
-                   <View style={{flex: 1}}><Text style={styles.metaLabel}>Last Service</Text><Text style={styles.detailVal}>{selectedItem?.last_service_date || 'N/A'}</Text></View>
-                   <View style={{flex: 1}}><Text style={styles.metaLabel}>Next Due</Text><Text style={[styles.detailVal, {color: COLORS.secondary}]}>{selectedItem?.next_service_due || 'N/A'}</Text></View>
+            {/* LATEST EVIDENCE */}
+            <View style={styles.detailSection}>
+              <Text style={styles.label}>LATEST DIGITAL EVIDENCE</Text>
+              {loadingImg ? (
+                <ActivityIndicator color={COLORS.primary} />
+              ) : evidenceUri ? (
+                <View>
+                  {evidenceUri.toLowerCase().includes('.pdf') ? (
+                    <TouchableOpacity style={styles.pdfCard} onPress={() => openEvidence()}>
+                      <Ionicons name="document-text" size={32} color="#FF4D4F" />
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.pdfText}>View Statutory PDF</Text>
+                        <Text style={styles.pdfSub}>Touch to Open Document</Text>
+                      </View>
+                      <Ionicons name="open-outline" size={16} color={COLORS.textLight} />
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity onPress={() => openEvidence()} style={styles.imageContainer}>
+                      <Image 
+                        source={{ uri: evidenceUri }} 
+                        style={styles.evidenceImage} 
+                        resizeMode="cover"
+                      />
+                      <View style={styles.expandOverlay}>
+                        <Ionicons name="expand" size={14} color="#fff" />
+                        <Text style={styles.expandText}>Tap to Verify</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
                 </View>
+              ) : (
+                <View style={styles.noEvidence}>
+                  <Ionicons name="cloud-offline-outline" size={24} color={COLORS.lightGray} />
+                  <Text style={styles.noEvidenceText}>No valid cloud evidence attached.</Text>
+                </View>
+              )}
+            </View>
+
+            {/* ASSET MAINTENANCE HISTORY SECTION */}
+            {viewMode === 'Assets' && (
+              <View style={styles.detailSection}>
+                <Text style={styles.label}>MAINTENANCE HISTORY (TRAIL)</Text>
+                {loadingHistory ? (
+                  <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 20 }} />
+                ) : history.length > 0 ? (
+                  history.map((log, index) => (
+                    <View key={log.id} style={[styles.historyRow, index !== history.length -1 && styles.historyBorder]}>
+                      <View style={styles.historyHeader}>
+                        <Text style={styles.historyDate}>{new Date(log.service_date).toLocaleDateString('en-GB')}</Text>
+                        <Text style={styles.historyType}>{log.service_type || 'Maintenance'}</Text>
+                      </View>
+                      <Text style={styles.historyNotes}>{log.notes || 'Routine check performed.'}</Text>
+                      {log.certificate_url && (
+                        <TouchableOpacity 
+                          style={styles.historyLink} 
+                          onPress={() => {
+                            const { data } = supabase.storage.from('incident-evidence').getPublicUrl(log.certificate_url);
+                            openEvidence(data.publicUrl);
+                          }}
+                        >
+                          <Ionicons name="attach" size={14} color={COLORS.primary} />
+                          <Text style={styles.historyLinkText}>View Certificate</Text>
+                        </TouchableOpacity>
+                      )}
+                      <Text style={styles.historyBy}>By: {log.signature_url || 'Specialist'}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.noHistoryText}>No past service records found for this asset.</Text>
+                )}
               </View>
             )}
 
-            {/* EVIDENCE SECTION */}
-            {(selectedItem?.evidence_url) && (
-               <View style={styles.detailSection}>
-                 <Text style={styles.detailLabel}>EVIDENCE & DOCUMENTATION</Text>
-                 {selectedItem.evidence_url.toLowerCase().includes('.pdf') ? (
-                    <TouchableOpacity style={styles.pdfBtn} onPress={() => Linking.openURL(selectedItem.evidence_url)}>
-                        <Text style={styles.pdfBtnTxt}>📄 VIEW PDF CERTIFICATE</Text>
-                    </TouchableOpacity>
-                 ) : (
-                    <Image source={{ uri: selectedItem.evidence_url }} style={styles.evidenceImage} resizeMode="contain" />
-                 )}
-               </View>
+            {/* COMPLETION DATA FOR INCIDENTS/ACCIDENTS */}
+            {viewMode !== 'Assets' && (selectedItem?.status === 'Resolved' || selectedItem?.injury_description) && (
+              <View style={styles.detailSection}>
+                <Text style={styles.label}>COMPLETION DATA</Text>
+                
+                {selectedItem?.injury_description && (
+                   <>
+                    <Text style={styles.subLabel}>INJURY DESCRIPTION</Text>
+                    <Text style={styles.notesText}>{selectedItem.injury_description}</Text>
+                    <Text style={styles.subLabel}>TREATMENT</Text>
+                    <Text style={styles.notesText}>{selectedItem.treatment_given || 'None recorded'}</Text>
+                   </>
+                )}
+
+                {selectedItem?.resolution_notes && (
+                  <>
+                    <Text style={styles.subLabel}>RESOLUTION NOTES</Text>
+                    <Text style={styles.notesText}>{selectedItem.resolution_notes}</Text>
+                  </>
+                )}
+
+                {selectedItem?.remedial_actions && (
+                  <>
+                    <Text style={[styles.subLabel, { marginTop: 10 }]}>REMEDIAL ACTIONS</Text>
+                    <Text style={styles.notesText}>{selectedItem.remedial_actions}</Text>
+                  </>
+                )}
+
+                <View style={styles.divider} />
+                <Text style={styles.auditMeta}>
+                  Audited By: { selectedItem?.signed_by_name || selectedItem?.signed_off_by || 'Verified Specialist'}
+                </Text>
+              </View>
             )}
           </ScrollView>
         </SafeAreaView>
       </Modal>
 
       {viewMode !== 'Analytics' && (
-        <TouchableOpacity style={styles.exportBtn} onPress={handleExport}>
+        <TouchableOpacity style={styles.exportBtn} onPress={() => auditService.generateAuditPDF(viewMode, viewMode === 'Assets' ? filteredAssets : filteredIncidents, viewMode === 'Assets')}>
           <Text style={styles.exportTxt}>GENERATE {viewMode.toUpperCase()} PDF</Text>
         </TouchableOpacity>
       )}
@@ -296,7 +427,7 @@ const chartConfig = {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FB' },
+  container: { flex: 1, backgroundColor: '#F4F7FA' },
   header: { padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
   mainTitle: { ...TYPOGRAPHY.header, color: COLORS.primary },
   tabScroll: { marginTop: 15 },
@@ -310,34 +441,53 @@ const styles = StyleSheet.create({
   dateBtnLabel: { fontSize: 9, fontWeight: 'bold', color: COLORS.gray, letterSpacing: 1 },
   dateBtnVal: { fontSize: 14, fontWeight: 'bold', color: COLORS.primary, marginTop: 2 },
   dateDivider: { paddingHorizontal: 10, color: '#ccc' },
-  searchBar: { backgroundColor: '#fff', padding: 12, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#eee', color: '#000' },
+  searchBar: { backgroundColor: '#fff', padding: 12, borderRadius: 10, marginBottom: 15, marginHorizontal: 20, marginTop: 20, borderWidth: 1, borderColor: '#E1E6ED', color: '#000' },
   content: { flex: 1 },
   sectionTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 10, color: COLORS.primary, textTransform: 'uppercase' },
   chartStyle: { borderRadius: 16, marginVertical: 8 },
-  logCard: { backgroundColor: '#fff', padding: 15, borderRadius: 12, marginBottom: 10, ...SHADOWS.light },
+  logCard: { backgroundColor: '#fff', padding: 15, borderRadius: 12, marginBottom: 10, marginHorizontal: 20, ...SHADOWS.light, borderLeftWidth: 4, borderLeftColor: COLORS.primary },
   logHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  logDate: { fontSize: 10, color: COLORS.gray, fontWeight: 'bold' },
+  logDate: { fontSize: 10, color: COLORS.textLight, fontWeight: '800' },
   pill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
-  pillTxt: { color: '#fff', fontSize: 9, fontWeight: 'bold' },
-  riddorBadge: { backgroundColor: 'red', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
-  riddorText: { color: 'white', fontSize: 9, fontWeight: 'bold' },
-  logDesc: { fontSize: 14, fontWeight: 'bold', color: COLORS.text },
-  logLoc: { fontSize: 12, color: COLORS.gray, marginTop: 4 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: '#eee', alignItems: 'center' },
-  modalTitle: { fontSize: 16, fontWeight: 'bold' },
-  closeTxt: { color: COLORS.primary, fontWeight: 'bold' },
-  modalScroll: { padding: 20 },
-  detailCard: { backgroundColor: '#F8F9FB', padding: 20, borderRadius: 15, marginBottom: 20 },
-  detailSection: { borderTopWidth: 1, borderTopColor: '#eee', marginTop: 10, paddingTop: 10 },
-  detailLabel: { fontSize: 10, fontWeight: 'bold', color: '#999', marginTop: 10, letterSpacing: 0.5 },
-  detailVal: { fontSize: 16, fontWeight: '600', color: '#1A202C', marginTop: 4 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 },
-  metaLabel: { fontSize: 11, fontWeight: 'bold', color: COLORS.primary, marginTop: 15 },
-  notesBox: { backgroundColor: '#f9f9f9', padding: 12, borderRadius: 8, marginTop: 5, fontSize: 13, color: '#444' },
-  exportBtn: { margin: 20, backgroundColor: COLORS.success, padding: 18, borderRadius: 12, alignItems: 'center' },
-  exportTxt: { color: '#fff', fontWeight: 'bold' },
-  emptyTxt: { textAlign: 'center', marginTop: 50, color: COLORS.gray },
-  pdfBtn: { backgroundColor: '#FEE2E2', padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 10 },
-  pdfBtnTxt: { color: '#B91C1C', fontWeight: 'bold', fontSize: 13 },
-  evidenceImage: { width: '100%', height: 300, borderRadius: 12, marginTop: 10 }
+  pillTxt: { color: '#fff', fontSize: 9, fontWeight: '900' },
+  logDesc: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
+  logLoc: { fontSize: 12, color: COLORS.textLight, marginTop: 4 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee', alignItems: 'center' },
+  modalTitle: { fontSize: 16, fontWeight: '900', color: COLORS.primary },
+  closeTxt: { color: COLORS.secondary, fontWeight: '900' },
+  detailSection: { backgroundColor: '#fff', padding: 15, borderRadius: 12, marginBottom: 15, ...SHADOWS.light, borderWidth: 1, borderColor: '#E1E6ED' },
+  label: { fontSize: 10, fontWeight: '900', color: COLORS.secondary, marginBottom: 12, letterSpacing: 1 },
+  subLabel: { fontSize: 10, fontWeight: '800', color: COLORS.textLight, marginBottom: 5, textTransform: 'uppercase' },
+  timelineItem: { flexDirection: 'row', alignItems: 'center' },
+  timeInfo: { marginLeft: 10 },
+  timeLabel: { fontSize: 9, fontWeight: '800', color: COLORS.textLight },
+  timeValue: { fontSize: 13, color: COLORS.primary, fontWeight: '700' },
+  value: { fontSize: 16, color: COLORS.primary, fontWeight: '700', lineHeight: 22 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  locationText: { fontSize: 12, color: COLORS.textLight, marginLeft: 4 },
+  imageContainer: { borderRadius: 10, overflow: 'hidden', position: 'relative', marginTop: 5, backgroundColor: '#f0f0f0' },
+  evidenceImage: { width: '100%', height: 250 },
+  expandOverlay: { position: 'absolute', bottom: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.6)', padding: 6, borderRadius: 4, flexDirection: 'row', alignItems: 'center' },
+  expandText: { color: '#fff', fontSize: 10, fontWeight: 'bold', marginLeft: 4 },
+  pdfCard: { flexDirection: 'row', alignItems: 'center', padding: 15, backgroundColor: '#FFF1F0', borderRadius: 10, borderWidth: 1, borderColor: '#FFA39E' },
+  pdfText: { fontSize: 14, fontWeight: '700', color: '#CF1322' },
+  pdfSub: { fontSize: 10, color: '#CF1322', opacity: 0.6 },
+  noEvidence: { height: 100, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FB', borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, borderColor: '#C4CDD5' },
+  noEvidenceText: { color: COLORS.lightGray, fontSize: 12, marginTop: 5 },
+  exportBtn: { margin: 20, backgroundColor: '#00C853', padding: 18, borderRadius: 12, alignItems: 'center', ...SHADOWS },
+  exportTxt: { color: '#fff', fontWeight: '900', fontSize: 14, letterSpacing: 1 },
+  notesText: { fontSize: 13, color: COLORS.text, lineHeight: 18, backgroundColor: '#F4F7FA', padding: 12, borderRadius: 8, marginBottom: 10, fontWeight: '500' },
+  divider: { height: 1, backgroundColor: '#E1E6ED', marginVertical: 15 },
+  auditMeta: { fontSize: 11, fontWeight: '800', color: COLORS.secondary, textTransform: 'uppercase' },
+  emptyTxt: { textAlign: 'center', marginTop: 50, color: COLORS.textLight, fontWeight: '600' },
+  historyRow: { paddingVertical: 12 },
+  historyBorder: { borderBottomWidth: 1, borderBottomColor: '#eee' },
+  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  historyDate: { fontSize: 12, fontWeight: 'bold', color: COLORS.primary },
+  historyType: { fontSize: 10, color: COLORS.secondary, fontWeight: 'bold' },
+  historyNotes: { fontSize: 12, color: '#666', lineHeight: 18 },
+  historyBy: { fontSize: 10, color: COLORS.textLight, marginTop: 4, fontStyle: 'italic' },
+  historyLink: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  historyLinkText: { fontSize: 11, color: COLORS.primary, fontWeight: 'bold', marginLeft: 4, textDecorationLine: 'underline' },
+  noHistoryText: { fontSize: 12, color: COLORS.textLight, textAlign: 'center', marginVertical: 10 }
 });

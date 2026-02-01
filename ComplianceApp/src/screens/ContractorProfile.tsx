@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView, Linking, ScrollView } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import { supabase } from '../lib/supabase'; // Added for URL resolution
 import { contractorService, Contractor } from '../services/contractorService';
 import { fileService } from '../services/fileService';
 import { useAuth } from '../context/AuthContext';
@@ -27,14 +28,9 @@ export const ContractorProfile = () => {
     }
   };
 
-  if (!user || !user.id) {
-    Alert.alert("Error", "You must be logged in to upload documents.");
-    return;
-  }
-
   useEffect(() => {
     loadProfile();
-  }, []);
+  }, [user]);
 
   const handleUpdateSpecialism = async (val: string) => {
     if (!user?.id) return;
@@ -59,19 +55,18 @@ export const ContractorProfile = () => {
       setUploading(true);
       const file = res.assets[0];
       
-      // Fixed: Handle the hybrid return type (string | {offline: boolean, localUri: string})
-      const uploadResult = await fileService.uploadCompetenceDocument(user.id, file.uri, file.name);
-      
-      const publicUrl = typeof uploadResult === 'object' && uploadResult.offline 
-        ? uploadResult.localUri 
-        : (uploadResult as string);
+      const result = await fileService.uploadCompetenceDocument(user.id, file.uri, file.name);
 
-      await contractorService.submitCompetence(user.id, publicUrl);
+      // Extract the path string regardless of whether it's offline or online
+      const finalPath = typeof result === 'object' ? result.path : result;
+
+      // Now finalPath is guaranteed to be a string
+      await contractorService.submitCompetence(user.id, finalPath);
       
-      if (typeof uploadResult === 'object' && uploadResult.offline) {
-        Alert.alert("Offline", "Certification saved locally and will sync when connection returns.");
+      if (typeof result === 'object' && result.offline) {
+        Alert.alert("Offline", "Certification saved locally. It will sync when you are back online.");
       } else {
-        Alert.alert("Success", "Certification uploaded.");
+        Alert.alert("Success", "Certification updated. Pending verification.");
       }
       
       await loadProfile();
@@ -79,6 +74,26 @@ export const ContractorProfile = () => {
       Alert.alert("Upload Error", e.message);
     } finally {
       setUploading(false);
+    }
+  };
+
+  // Helper to open the certificate correctly
+  const handleViewCertificate = () => {
+    if (!profile?.competence_evidence_url) return;
+
+    const path = profile.competence_evidence_url;
+    
+    if (path.startsWith('http')) {
+      Linking.openURL(path);
+    } else {
+      // Resolve path to Public URL
+      const { data } = supabase.storage
+        .from('evidence')
+        .getPublicUrl(path);
+      
+      if (data?.publicUrl) {
+        Linking.openURL(data.publicUrl);
+      }
     }
   };
 
@@ -119,18 +134,12 @@ export const ContractorProfile = () => {
           )}
 
           <TouchableOpacity style={styles.uploadBtn} onPress={handleUploadCompetence} disabled={uploading}>
-            <Text style={styles.uploadBtnText}>{uploading ? "UPLOADING..." : "UPLOAD COMPETENCY PROOF"}</Text>
+            <Text style={styles.uploadBtnText}>{uploading ? "UPLOADING..." : "REPLACE COMPETENCY PROOF"}</Text>
           </TouchableOpacity>
           
           {profile?.competence_evidence_url && (
             <TouchableOpacity 
-              onPress={() => {
-                if (profile.competence_evidence_url) {
-                  Linking.openURL(profile.competence_evidence_url);
-                } else {
-                  Alert.alert("Error", "Document link is missing.");
-                }
-              }} 
+              onPress={handleViewCertificate} 
               style={styles.viewBtn}
             >
               <Text style={styles.viewBtnText}>View Current Certificate →</Text>
@@ -138,22 +147,22 @@ export const ContractorProfile = () => {
           )}
 
           <View style={styles.governanceBox}>
-  <Text style={styles.label}>PRIVACY & DATA RIGHTS</Text>
-  <Text style={styles.infoText}>
-    Your data is stored securely in an encrypted vault. You have the right to export your professional record at any time.
-  </Text>
-  
-  <TouchableOpacity 
-    style={styles.exportBtn} 
-    onPress={() => privacyService.downloadMyData(user.id)}
-  >
-    <Text style={styles.exportBtnText}>EXPORT MY DATA (JSON)</Text>
-  </TouchableOpacity>
+            <Text style={styles.label}>PRIVACY & DATA RIGHTS</Text>
+            <Text style={styles.infoText}>
+              Your data is stored securely in an encrypted vault. You have the right to export your professional record at any time.
+            </Text>
+            
+            <TouchableOpacity 
+              style={styles.exportBtn} 
+              onPress={() => user?.id && privacyService.downloadMyData(user.id)}
+            >
+              <Text style={styles.exportBtnText}>EXPORT MY DATA (JSON)</Text>
+            </TouchableOpacity>
 
-  <Text style={styles.caption}>
-    To request account deletion or data erasure, please contact the Site Manager.
-  </Text>
-</View>
+            <Text style={styles.caption}>
+              To request account deletion or data erasure, please contact the Site Manager.
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -181,8 +190,8 @@ const styles = StyleSheet.create({
   viewBtn: { marginTop: 20, alignItems: 'center' },
   viewBtnText: { color: COLORS.primary, fontWeight: '600', textDecorationLine: 'underline' },
   governanceBox: { marginTop: 30, padding: 15, backgroundColor: '#f8f9fa', borderRadius: 10, borderStyle: 'dashed', borderWidth: 1, borderColor: '#ccc' },
-infoText: { fontSize: 12, color: COLORS.gray, marginBottom: 15, lineHeight: 18 },
-exportBtn: { backgroundColor: COLORS.white, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: COLORS.primary, alignItems: 'center' },
-exportBtnText: { color: COLORS.primary, fontWeight: 'bold', fontSize: 13 },
-caption: { fontSize: 10, color: COLORS.lightGray, marginTop: 10, textAlign: 'center' }
+  infoText: { fontSize: 12, color: COLORS.gray, marginBottom: 15, lineHeight: 18 },
+  exportBtn: { backgroundColor: COLORS.white, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: COLORS.primary, alignItems: 'center' },
+  exportBtnText: { color: COLORS.primary, fontWeight: 'bold', fontSize: 13 },
+  caption: { fontSize: 10, color: COLORS.lightGray, marginTop: 10, textAlign: 'center' }
 });

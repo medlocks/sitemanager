@@ -76,7 +76,7 @@ export const auditService = {
             ${data.map(item => `
               <tr>
                 <td style="padding: 8px;">${item.asset_name || item.description}</td>
-                <td style="padding: 8px;">${formatDate(item.created_at || item.last_service_date)}</td>
+                <td style="padding: 8px;">${formatDate(item.created_at || item.last_service)}</td>
                 <td style="padding: 8px;">${isAsset ? formatDate(item.next_service_due) : (item.profiles?.name || 'Unassigned')}</td>
                 <td style="padding: 8px;">${item.status}</td>
               </tr>

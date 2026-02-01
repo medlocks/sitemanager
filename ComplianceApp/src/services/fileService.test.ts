@@ -2,10 +2,14 @@ import { fileService } from './fileService';
 import { supabase } from '../lib/supabase';
 import NetInfo from '@react-native-community/netinfo';
 import { syncService } from './syncService';
+import * as FileSystem from 'expo-file-system/legacy';
 
 jest.mock('../lib/supabase');
 jest.mock('./syncService', () => ({
   syncService: { enqueue: jest.fn() }
+}));
+jest.mock('expo-file-system/legacy', () => ({
+  readAsStringAsync: jest.fn().mockResolvedValue('base64data')
 }));
 
 describe('FileService', () => {
@@ -19,39 +23,54 @@ describe('FileService', () => {
       upload: mockUpload,
       getPublicUrl: mockGetUrl
     });
-
-    global.fetch = jest.fn().mockResolvedValue({
-      blob: jest.fn().mockResolvedValue({ size: 1024, type: 'application/pdf' })
-    });
   });
 
-  it('should upload base64 image online', async () => {
+  it('should upload incident evidence online and return filename', async () => {
     (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
-    mockUpload.mockResolvedValue({ data: { path: 'test' }, error: null });
-    mockGetUrl.mockReturnValue({ data: { publicUrl: 'http://url.com' } });
+    mockUpload.mockResolvedValue({ data: { path: 'fault_123.jpg' }, error: null });
 
-    const result = await fileService.uploadFile('bucket', 'path.jpg', 'base64string');
+    const result = await fileService.uploadIncidentEvidence('user123', 'file://test-image.jpg');
     
-    expect(result).toBe('http://url.com');
+    // Result should be a string (the path) when online
+    expect(typeof result).toBe('string');
+    expect(result).toMatch(/^fault_\d+\.jpg$/);
+    expect(supabase.storage.from).toHaveBeenCalledWith('incident-evidence');
+  });
+
+  it('should upload base64 file and return path', async () => {
+    (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+    mockUpload.mockResolvedValue({ data: { path: 'path.jpg' }, error: null });
+
+    const result = await fileService.uploadFile('incident-evidence', 'path.jpg', 'file://path.jpg');
+    
+    expect(result).toBe('path.jpg');
     expect(mockUpload).toHaveBeenCalled();
   });
 
-  it('should upload document URI online', async () => {
-    (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
-    mockUpload.mockResolvedValue({ data: { path: 'test' }, error: null });
-    mockGetUrl.mockReturnValue({ data: { publicUrl: 'http://url.com' } });
-
-    const result = await fileService.uploadCompetenceDocument('u1', 'file://test.pdf', 'test.pdf');
-    
-    expect(result).toBe('http://url.com');
-    expect(global.fetch).toHaveBeenCalledWith('file://test.pdf');
-  });
-
-  it('should enqueue when offline', async () => {
+  it('should enqueue to incident-evidence bucket when offline', async () => {
     (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: false });
     
-    await fileService.uploadFile('bucket', 'path.jpg', 'base64');
+    const result = await fileService.uploadIncidentEvidence('user123', 'file://test.jpg');
     
-    expect(syncService.enqueue).toHaveBeenCalledWith('storage_uploads', expect.any(Object));
+    // Check that we received the offline object
+    expect(result).toHaveProperty('offline', true);
+    expect(result).toHaveProperty('path', expect.stringMatching(/^fault_\d+\.jpg$/));
+    
+    expect(syncService.enqueue).toHaveBeenCalledWith('storage_uploads', expect.objectContaining({
+      bucket: 'incident-evidence'
+    }));
+  });
+
+  it('should handle PDF content type correctly', async () => {
+    (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+    mockUpload.mockResolvedValue({ data: { path: 'fault_123.pdf' }, error: null });
+
+    await fileService.uploadIncidentEvidence('user123', 'file://test.pdf');
+
+    expect(mockUpload).toHaveBeenCalledWith(
+      expect.stringContaining('.pdf'),
+      expect.any(Object),
+      expect.objectContaining({ contentType: 'application/pdf' })
+    );
   });
 });

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, SafeAreaView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { accidentService } from '../services/accidentService';
+import { notificationService } from '../services/notificationService';
 import { useAuth } from '../context/AuthContext';
-import { COLORS, TYPOGRAPHY, SPACING } from '../theme';
+import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '../theme';
 
 export const LogAccident = ({ navigation }: any) => {
   const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     injured_person_name: '',
     location: '',
@@ -22,45 +24,128 @@ export const LogAccident = ({ navigation }: any) => {
     }
 
     try {
+      setLoading(true);
       await accidentService.logAccident({ ...form, user_id: user?.id });
-      Alert.alert("Success", "Accident logged in the statutory book.");
-      navigation.goBack();
+
+      await notificationService.notifyManagers(
+        "CRITICAL: ACCIDENT LOGGED",
+        `Statutory entry for ${form.injured_person_name} at ${form.location} logged by ${user?.name}`,
+        "ACCIDENT"
+      );
+
+      Alert.alert(
+        "Entry Sealed", 
+        "Accident logged in the statutory book. Site management has been alerted.",
+        [{ text: "OK", onPress: () => navigation.goBack() }]
+      );
     } catch (e: any) {
-      Alert.alert("Error", e.message);
+      Alert.alert("Registry Error", e.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Statutory Accident Book</Text>
-      
-      <Text style={styles.label}>Name of Injured Person</Text>
-      <TextInput style={styles.input} value={form.injured_person_name} onChangeText={(v) => setForm({...form, injured_person_name: v})} />
+    <SafeAreaView style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Statutory Accident Book</Text>
+          <Text style={styles.subtitle}>Official RIDDOR-Compliant Registry</Text>
+        </View>
 
-      <Text style={styles.label}>Location of Accident</Text>
-      <TextInput style={styles.input} value={form.location} onChangeText={(v) => setForm({...form, location: v})} />
+        <View style={styles.formCard}>
+          <Text style={styles.label}>NAME OF INJURED PERSON</Text>
+          <TextInput 
+            style={styles.input} 
+            value={form.injured_person_name} 
+            onChangeText={(v) => setForm({...form, injured_person_name: v})} 
+            placeholder="Full Name"
+          />
 
-      <Text style={styles.label}>Description of Injury & Event</Text>
-      <TextInput style={[styles.input, {height: 100}]} multiline value={form.injury_description} onChangeText={(v) => setForm({...form, injury_description: v})} />
+          <Text style={styles.label}>LOCATION OF ACCIDENT</Text>
+          <TextInput 
+            style={styles.input} 
+            value={form.location} 
+            onChangeText={(v) => setForm({...form, location: v})} 
+            placeholder="e.g. Workshop B"
+          />
 
-      <View style={styles.switchRow}>
-        <Text style={styles.label}>RIDDOR Reportable?</Text>
-        <Switch value={form.is_riddor_reportable} onValueChange={(v) => setForm({...form, is_riddor_reportable: v})} />
-      </View>
+          <Text style={styles.label}>DESCRIPTION OF INJURY & EVENT</Text>
+          <TextInput 
+            style={[styles.input, {height: 100}]} 
+            multiline 
+            value={form.injury_description} 
+            onChangeText={(v) => setForm({...form, injury_description: v})} 
+            textAlignVertical="top"
+            placeholder="Detailed account of incident..."
+          />
 
-      <TouchableOpacity style={styles.btn} onPress={handleSubmit}>
-        <Text style={styles.btnText}>SUBMIT ENTRY</Text>
-      </TouchableOpacity>
-    </ScrollView>
+          <View style={styles.switchRow}>
+            <View>
+              <Text style={styles.label}>RIDDOR REPORTABLE?</Text>
+              <Text style={styles.hint}>Does this require HSE notification?</Text>
+            </View>
+            <Switch 
+              value={form.is_riddor_reportable} 
+              onValueChange={(v) => setForm({...form, is_riddor_reportable: v})} 
+              trackColor={{ false: "#D1D5DB", true: COLORS.secondary }}
+            />
+          </View>
+
+          <TouchableOpacity 
+            style={[styles.btn, loading && { opacity: 0.7 }]} 
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            <Text style={styles.btnText}>{loading ? "SEALING RECORD..." : "SUBMIT OFFICIAL ENTRY"}</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#fff' },
-  title: { ...TYPOGRAPHY.header, color: COLORS.secondary, marginBottom: 20 },
-  label: { fontSize: 12, fontWeight: 'bold', color: COLORS.gray, marginBottom: 5 },
-  input: { borderWidth: 1, borderColor: '#eee', padding: 12, borderRadius: 8, marginBottom: 20 },
-  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
-  btn: { backgroundColor: COLORS.secondary, padding: 18, borderRadius: 12, alignItems: 'center' },
-  btnText: { color: '#fff', fontWeight: 'bold' }
+  safe: { flex: 1, backgroundColor: '#F4F7FA' },
+  content: { padding: 20 },
+  header: { marginBottom: 25 },
+  title: { ...TYPOGRAPHY.header, color: COLORS.primary, fontSize: 22 },
+  subtitle: { ...TYPOGRAPHY.caption, color: COLORS.textLight, marginTop: 4 },
+  formCard: {
+    backgroundColor: COLORS.white,
+    padding: 20,
+    borderRadius: 16,
+    ...SHADOWS.light,
+    borderWidth: 1,
+    borderColor: '#E1E6ED'
+  },
+  label: { fontSize: 11, fontWeight: '800', color: COLORS.primary, marginBottom: 8, letterSpacing: 0.5 },
+  hint: { fontSize: 10, color: COLORS.textLight, marginTop: -4, marginBottom: 8 },
+  input: { 
+    backgroundColor: '#F8F9FB', 
+    borderWidth: 1, 
+    borderColor: '#E1E6ED', 
+    padding: 15, 
+    borderRadius: 12, 
+    marginBottom: 20,
+    fontSize: 15,
+    color: COLORS.text 
+  },
+  switchRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 30,
+    padding: 15,
+    backgroundColor: '#F0F4F8',
+    borderRadius: 12
+  },
+  btn: { 
+    backgroundColor: COLORS.secondary, 
+    padding: 18, 
+    borderRadius: 12, 
+    alignItems: 'center',
+    ...SHADOWS.light 
+  },
+  btnText: { color: '#fff', fontWeight: '800', fontSize: 16, letterSpacing: 1 }
 });

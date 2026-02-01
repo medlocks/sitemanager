@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">60.97% </span>
+                <span class="strong">61.36% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>25/41</span>
+                <span class='fraction'>27/44</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">33.33% </span>
+                <span class="strong">34.61% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>8/24</span>
+                <span class='fraction'>9/26</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">68.57% </span>
+                <span class="strong">68.42% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>24/35</span>
+                <span class='fraction'>26/38</span>
             </div>
         
             
@@ -128,7 +128,10 @@
 <a name='L63'></a><a href='#L63'>63</a>
 <a name='L64'></a><a href='#L64'>64</a>
 <a name='L65'></a><a href='#L65'>65</a>
-<a name='L66'></a><a href='#L66'>66</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -149,8 +152,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -165,6 +168,8 @@
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -183,6 +188,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -230,10 +236,12 @@ export const syncService = {
     for (const item of queue) {
       try {
         if (item.table === 'storage_uploads') {
-          if (item.data.base64Str) {
+          <span class="missing-if-branch" title="if path not taken" >I</span>if (item.data.bucket === 'incident-evidence') {
+<span class="cstat-no" title="statement not covered" >            await fileService.uploadIncidentEvidence(item.data.userId, item.data.fileUri, true);</span>
+          } else if (item.data.base64Str) {
             await fileService.uploadFile(item.data.bucket, item.data.path, item.data.base64Str);
           } else <span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="else path not taken" >E</span>if (item.data.fileUri) {</span>
-<span class="cstat-no" title="statement not covered" >            await fileService.uploadCompetenceDocument(item.data.userId, item.data.fileUri, item.data.fileName);</span>
+<span class="cstat-no" title="statement not covered" >            await fileService.uploadCompetenceDocument(item.data.userId, item.data.fileUri, item.data.fileName, true);</span>
           }
         } else if (item.table === 'site_settings_updates') {
           const { error } = await supabase.from('site_settings').update(item.data).eq('id', item.data.id);
@@ -248,10 +256,11 @@ export const syncService = {
 <span class="cstat-no" title="statement not covered" >          if (error) <span class="cstat-no" title="statement not covered" >throw error;</span></span>
         }
 &nbsp;
-        queue = queue.filter((i: any) =&gt; i.id !== item.id);
-        await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+        const currentQueue = await this.getQueue();
+        const updatedQueue = currentQueue.filter((i: any) =&gt; i.id !== item.id);
+        await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(updatedQueue));
       } catch (e) {
-<span class="cstat-no" title="statement not covered" >        console.error(`Failed to sync item ${item.id}, staying in queue`, e);</span>
+<span class="cstat-no" title="statement not covered" >        console.error(`Failed to sync item ${item.id}`, e);</span>
 <span class="cstat-no" title="statement not covered" >        return; </span>
       }
     }
@@ -265,7 +274,7 @@ export const syncService = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-01-31T02:00:07.537Z
+                at 2026-02-01T15:41:08.079Z
             </div>
         <script src="prettify.js"></script>
         <script>

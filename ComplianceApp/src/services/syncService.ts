@@ -35,10 +35,12 @@ export const syncService = {
     for (const item of queue) {
       try {
         if (item.table === 'storage_uploads') {
-          if (item.data.base64Str) {
+          if (item.data.bucket === 'incident-evidence') {
+            await fileService.uploadIncidentEvidence(item.data.userId, item.data.fileUri, true);
+          } else if (item.data.base64Str) {
             await fileService.uploadFile(item.data.bucket, item.data.path, item.data.base64Str);
           } else if (item.data.fileUri) {
-            await fileService.uploadCompetenceDocument(item.data.userId, item.data.fileUri, item.data.fileName);
+            await fileService.uploadCompetenceDocument(item.data.userId, item.data.fileUri, item.data.fileName, true);
           }
         } else if (item.table === 'site_settings_updates') {
           const { error } = await supabase.from('site_settings').update(item.data).eq('id', item.data.id);
@@ -53,10 +55,11 @@ export const syncService = {
           if (error) throw error;
         }
 
-        queue = queue.filter((i: any) => i.id !== item.id);
-        await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+        const currentQueue = await this.getQueue();
+        const updatedQueue = currentQueue.filter((i: any) => i.id !== item.id);
+        await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(updatedQueue));
       } catch (e) {
-        console.error(`Failed to sync item ${item.id}, staying in queue`, e);
+        console.error(`Failed to sync item ${item.id}`, e);
         return; 
       }
     }

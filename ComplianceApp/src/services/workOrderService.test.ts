@@ -40,7 +40,6 @@ describe('WorkOrderService', () => {
     (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true }); 
     (fileService.uploadFile as jest.Mock).mockResolvedValue('https://vault.url/img.jpg');
 
-    // ARGS: userId, task, formData
     await workOrderService.resolveTask(mockUserId, mockTask, mockFormData);
 
     expect(fileService.uploadFile).toHaveBeenCalled();
