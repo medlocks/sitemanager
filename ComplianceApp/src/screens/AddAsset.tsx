@@ -78,19 +78,38 @@ export const AddAsset = ({ route, navigation }: any) => {
         <Text style={styles.title}>{isEditing ? 'Update Asset' : 'New Asset'}</Text>
         
         <Text style={styles.label}>ASSET NAME</Text>
-        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Name" />
+        <TextInput 
+          testID="input-asset-name"
+          style={styles.input} 
+          value={name} 
+          onChangeText={setName} 
+          placeholder="Name" 
+        />
 
         <Text style={styles.label}>CATEGORY</Text>
-        <TextInput style={styles.input} value={type} onChangeText={setType} placeholder="Type" />
+        <TextInput 
+          testID="input-asset-category"
+          style={styles.input} 
+          value={type} 
+          onChangeText={setType} 
+          placeholder="Type" 
+        />
 
         <Text style={styles.label}>REGULATION</Text>
-        <TextInput style={styles.input} value={regulation} onChangeText={setRegulation} placeholder="Regulation" />
+        <TextInput 
+          testID="input-asset-regulation"
+          style={styles.input} 
+          value={regulation} 
+          onChangeText={setRegulation} 
+          placeholder="Regulation" 
+        />
 
         <Text style={styles.label}>CLEARANCE</Text>
         <View style={styles.clearanceRow}>
           {['None', 'BPSS', 'SC', 'DV'].map(level => (
             <TouchableOpacity 
               key={level} 
+              testID={`chip-clearance-${level}`}
               style={[styles.chip, minClearance === level && styles.chipActive]} 
               onPress={() => setMinClearance(level)}
             >
@@ -100,14 +119,29 @@ export const AddAsset = ({ route, navigation }: any) => {
         </View>
 
         <Text style={styles.label}>LOCATION</Text>
-        <TextInput style={styles.input} value={location} onChangeText={setLocation} placeholder="Location" />
+        <TextInput 
+          testID="input-asset-location"
+          style={styles.input} 
+          value={location} 
+          onChangeText={setLocation} 
+          placeholder="Location" 
+        />
 
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={loading}>
+        <TouchableOpacity 
+          testID="btn-save-asset"
+          style={styles.saveBtn} 
+          onPress={handleSave} 
+          disabled={loading}
+        >
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>SAVE RECORD</Text>}
         </TouchableOpacity>
 
         {isEditing && (
-          <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+          <TouchableOpacity 
+            testID="btn-delete-asset"
+            style={styles.deleteBtn} 
+            onPress={handleDelete}
+          >
             <Text style={styles.deleteBtnText}>DELETE ASSET</Text>
           </TouchableOpacity>
         )}

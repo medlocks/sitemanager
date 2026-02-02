@@ -56,6 +56,7 @@ export const LogAccident = ({ navigation }: any) => {
         <View style={styles.formCard}>
           <Text style={styles.label}>NAME OF INJURED PERSON</Text>
           <TextInput 
+            testID="input-injured-name"
             style={styles.input} 
             value={form.injured_person_name} 
             onChangeText={(v) => setForm({...form, injured_person_name: v})} 
@@ -64,6 +65,7 @@ export const LogAccident = ({ navigation }: any) => {
 
           <Text style={styles.label}>LOCATION OF ACCIDENT</Text>
           <TextInput 
+            testID="input-accident-location"
             style={styles.input} 
             value={form.location} 
             onChangeText={(v) => setForm({...form, location: v})} 
@@ -72,6 +74,7 @@ export const LogAccident = ({ navigation }: any) => {
 
           <Text style={styles.label}>DESCRIPTION OF INJURY & EVENT</Text>
           <TextInput 
+            testID="input-injury-description"
             style={[styles.input, {height: 100}]} 
             multiline 
             value={form.injury_description} 
@@ -86,6 +89,7 @@ export const LogAccident = ({ navigation }: any) => {
               <Text style={styles.hint}>Does this require HSE notification?</Text>
             </View>
             <Switch 
+              testID="switch-riddor"
               value={form.is_riddor_reportable} 
               onValueChange={(v) => setForm({...form, is_riddor_reportable: v})} 
               trackColor={{ false: "#D1D5DB", true: COLORS.secondary }}
@@ -93,6 +97,7 @@ export const LogAccident = ({ navigation }: any) => {
           </View>
 
           <TouchableOpacity 
+            testID="btn-submit-accident"
             style={[styles.btn, loading && { opacity: 0.7 }]} 
             onPress={handleSubmit}
             disabled={loading}

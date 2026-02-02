@@ -37,20 +37,17 @@ export const Dashboard = ({ navigation }: any) => {
     fetchData();
 
     if (isManager) {
-      // 1. Create a unique channel for this dashboard
       const channel = supabase.channel('realtime_incidents')
         .on(
           'postgres_changes', 
           { event: '*', schema: 'public', table: 'incidents' }, 
           (payload) => {
-            // 2. Tactical state updates for "Live" feel
             if (payload.eventType === 'INSERT') {
               setFeed(prev => [payload.new, ...prev].slice(0, 8));
               if (payload.new.status === 'Pending') setPendingCount(c => c + 1);
             } 
             else if (payload.eventType === 'UPDATE') {
               setFeed(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
-              // Refresh counts globally on update to ensure accuracy
               fetchData(); 
             }
             else if (payload.eventType === 'DELETE') {
@@ -88,6 +85,7 @@ export const Dashboard = ({ navigation }: any) => {
         
         {isManager && pendingCount > 0 && (
           <TouchableOpacity 
+            testID="manager-pending-banner"
             style={styles.summaryBanner}
             onPress={() => navigation.navigate('AuditReport')}
           >
@@ -103,6 +101,7 @@ export const Dashboard = ({ navigation }: any) => {
           {filteredItems.map((item) => (
             <TouchableOpacity 
               key={item.id} 
+              testID={`menu-item-${item.screen}`}
               style={styles.card} 
               onPress={() => navigation.navigate(item.screen)}
             >
@@ -124,9 +123,10 @@ export const Dashboard = ({ navigation }: any) => {
 
             {loading ? (
               <ActivityIndicator color={COLORS.primary} style={{ marginTop: 20 }} />
-            ) : feed.map((item) => (
+            ) : feed.map((item, index) => (
               <TouchableOpacity 
                 key={item.id} 
+                testID={`incident-feed-item-${index}`}
                 style={styles.feedItem}
                 onPress={() => navigation.navigate('IncidentDetail', { incident: item })}
               >
@@ -157,10 +157,10 @@ export const Dashboard = ({ navigation }: any) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F4F7FA' },
-  content: { padding: SPACING.m },
+  content: { padding: 15 },
   hero: { marginBottom: 20, paddingLeft: 5 },
   greeting: { fontSize: 11, fontWeight: '800', color: COLORS.secondary, letterSpacing: 1.5 },
-  name: { ...TYPOGRAPHY.header, fontSize: 26, color: COLORS.primary, marginTop: 4 },
+  name: { fontSize: 26, color: COLORS.primary, marginTop: 4, fontWeight: 'bold' },
   summaryBanner: {
     backgroundColor: COLORS.secondary,
     flexDirection: 'row',
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 20,
     gap: 10,
-    ...SHADOWS.light
+    elevation: 3
   },
   summaryText: { color: COLORS.white, fontWeight: '800', fontSize: 12, letterSpacing: 0.5 },
   grid: { gap: 10, marginBottom: 30 },
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     padding: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    ...SHADOWS.light,
+    elevation: 2,
     borderWidth: 1,
     borderColor: '#E1E6ED'
   },
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-    ...SHADOWS.light,
+    elevation: 1,
     borderWidth: 1,
     borderColor: '#E1E6ED'
   },
@@ -206,5 +206,5 @@ const styles = StyleSheet.create({
   feedDesc: { fontSize: 13, fontWeight: '700', color: COLORS.primary, flex: 0.75 },
   feedMeta: { fontSize: 11, color: COLORS.textLight, marginTop: 2 },
   statusTag: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
-  emptyText: { textAlign: 'center', color: COLORS.lightGray, marginTop: 20, fontSize: 12 }
-});
+  emptyText: { textAlign: 'center', color: '#A0AEC0', marginTop: 20, fontSize: 12 }
+});s

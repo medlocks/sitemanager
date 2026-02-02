@@ -28,7 +28,11 @@ export const BuildingServices = ({ navigation }: any) => {
     navigation.setOptions({
       headerRight: () => (
         user?.role === 'Manager' && (
-          <TouchableOpacity onPress={() => navigation.navigate('AddAsset')} style={styles.navAddBtn}>
+          <TouchableOpacity 
+            testID="btn-nav-add-asset"
+            onPress={() => navigation.navigate('AddAsset')} 
+            style={styles.navAddBtn}
+          >
             <Text style={styles.navAddText}>+ NEW</Text>
           </TouchableOpacity>
         )
@@ -50,12 +54,13 @@ export const BuildingServices = ({ navigation }: any) => {
     }
   };
 
-  const renderService = ({ item }: { item: any }) => {
+  const renderService = ({ item, index }: { item: any, index: number }) => {
     const isCompliant = item.status === 'Compliant';
     const isManager = user?.role === 'Manager';
 
     return (
       <TouchableOpacity 
+        testID={`asset-card-${index}`}
         style={[styles.card, { borderLeftColor: isCompliant ? COLORS.success : COLORS.secondary }]}
         onPress={() => isManager && navigation.navigate('AddAsset', { asset: item })}
       >
@@ -76,12 +81,17 @@ export const BuildingServices = ({ navigation }: any) => {
         {isManager && (
           <View style={styles.actionRow}>
             <TouchableOpacity 
+              testID={`btn-assign-asset-${index}`}
               style={styles.assignBtn}
               onPress={() => navigation.navigate('ContractorAssignment', { incidentId: item.id, isAsset: true, assetName: item.assetName })}
             >
               <Text style={styles.btnText}>ASSIGN</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.copyBtn} onPress={() => handleDuplicate(item)}>
+            <TouchableOpacity 
+              testID={`btn-copy-asset-${index}`}
+              style={styles.copyBtn} 
+              onPress={() => handleDuplicate(item)}
+            >
               <Text style={styles.copyText}>COPY</Text>
             </TouchableOpacity>
           </View>
@@ -93,8 +103,13 @@ export const BuildingServices = ({ navigation }: any) => {
   return (
     <View style={styles.container}>
       <Text style={styles.mainTitle}>Asset Register</Text>
-      {loading ? <ActivityIndicator size="large" color={COLORS.primary} /> : (
-        <FlatList data={services} keyExtractor={(item) => item.id} renderItem={renderService} />
+      {loading ? <ActivityIndicator size="large" color={COLORS.primary} testID="loading-indicator" /> : (
+        <FlatList 
+          testID="asset-list"
+          data={services} 
+          keyExtractor={(item) => item.id} 
+          renderItem={({item, index}) => renderService({item, index})} 
+        />
       )}
     </View>
   );

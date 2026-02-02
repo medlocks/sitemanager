@@ -33,7 +33,10 @@ export const ContractorDetail = ({ route, navigation }: any) => {
             <Text style={styles.badgeTxt}>{contractor.specialism?.toUpperCase() || 'GENERAL'}</Text>
           </View>
           <Text style={styles.email}>{contractor.email}</Text>
-          <Text style={[styles.statusInfo, { color: status === 'Approved' ? COLORS.success : COLORS.secondary }]}>
+          <Text 
+            testID="contractor-status-text"
+            style={[styles.statusInfo, { color: status === 'Approved' ? COLORS.success : COLORS.secondary }]}
+          >
             Current Status: {status}
           </Text>
         </View>
@@ -41,6 +44,7 @@ export const ContractorDetail = ({ route, navigation }: any) => {
         <View style={styles.section}>
           <Text style={styles.label}>Statutory Documents</Text>
           <TouchableOpacity 
+            testID="btn-view-contractor-cert"
             style={styles.fileBtn} 
             onPress={() => contractor.competence_evidence_url ? Linking.openURL(contractor.competence_evidence_url) : Alert.alert("Error", "No document available")}
           >
@@ -50,16 +54,18 @@ export const ContractorDetail = ({ route, navigation }: any) => {
 
         <View style={styles.actionSection}>
           {loading ? (
-            <ActivityIndicator color={COLORS.primary} />
+            <ActivityIndicator testID="status-loading-indicator" color={COLORS.primary} />
           ) : (
             <>
               <TouchableOpacity 
+                testID="btn-approve-contractor"
                 style={styles.approveBtn} 
                 onPress={() => handleUpdateStatus('Approved')}
               >
                 <Text style={styles.btnTxt}>APPROVE OPERATIVE</Text>
               </TouchableOpacity>
               <TouchableOpacity 
+                testID="btn-suspend-contractor"
                 style={styles.suspendBtn} 
                 onPress={() => handleUpdateStatus('Rejected')}
               >

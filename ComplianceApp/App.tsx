@@ -54,6 +54,7 @@ const LoginScreen = () => {
         <Text style={styles.subtitle}>Secure Site Access Portal</Text>
         
         <TextInput
+          testID="login-email-input"
           style={styles.input}
           placeholder="Email Address"
           value={email}
@@ -63,6 +64,7 @@ const LoginScreen = () => {
         />
 
         <TextInput
+          testID="login-password-input"
           style={styles.input}
           placeholder="Password"
           value={password}
@@ -71,6 +73,7 @@ const LoginScreen = () => {
         />
 
         <TouchableOpacity 
+          testID="login-submit-btn"
           style={[styles.btn, { backgroundColor: COLORS.primary }]} 
           onPress={handleLogin}
           disabled={loading}
@@ -147,7 +150,7 @@ const AuthenticatedApp = () => {
               ) : null
             ),
             headerRight: () => (
-              <TouchableOpacity onPress={logout} style={{ marginRight: 15 }}>
+              <TouchableOpacity testID="header-logout-btn" onPress={logout} style={{ marginRight: 15 }}>
                 <Text style={{ color: COLORS.secondary, fontWeight: '700', fontSize: 11 }}>LOGOUT</Text>
               </TouchableOpacity>
             ),

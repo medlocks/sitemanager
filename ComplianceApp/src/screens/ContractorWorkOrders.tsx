@@ -113,7 +113,7 @@ export const ContractorWorkOrders = ({ navigation }: any) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.quickRow}>
         <TouchableOpacity 
-          testID="btn-accident"
+          testID="btn-quick-accident"
           style={styles.quickBtn} 
           onPress={() => navigation.navigate('LogAccident')}
         >
@@ -121,7 +121,7 @@ export const ContractorWorkOrders = ({ navigation }: any) => {
           <Text style={styles.quickBtnText}>ACCIDENT</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          testID="btn-fault"
+          testID="btn-quick-fault"
           style={styles.quickBtn} 
           onPress={() => navigation.navigate('FaultReporting')}
         >
@@ -130,7 +130,7 @@ export const ContractorWorkOrders = ({ navigation }: any) => {
         </TouchableOpacity>
         
         <TouchableOpacity 
-          testID="btn-profile"
+          testID="btn-quick-profile"
           style={[styles.quickBtn, { borderLeftWidth: 2, borderLeftColor: COLORS.primary }]} 
           onPress={() => navigation.navigate('ContractorProfile')}
         >
@@ -149,7 +149,7 @@ export const ContractorWorkOrders = ({ navigation }: any) => {
               <Text style={styles.orderLoc}>{item.location}</Text>
             </View>
             <TouchableOpacity 
-              testID={`sign-off-btn-${index}`}
+              testID={`btn-sign-off-${index}`}
               style={styles.signBtn} 
               onPress={() => { setSelectedTask(item); setUploadModalVisible(true); }}
             >
@@ -162,58 +162,61 @@ export const ContractorWorkOrders = ({ navigation }: any) => {
       />
 
       <Modal visible={uploadModalVisible} animationType="slide">
-        <SafeAreaView style={styles.modalContent}>
+        <SafeAreaView style={styles.modalContent} testID="sign-off-modal">
           <ScrollView contentContainerStyle={{ padding: 25 }}>
             <Text style={styles.modalHeader}>STATUTORY CERTIFICATION</Text>
+            
             <View style={styles.fileRow}>
-              <TouchableOpacity testID="upload-camera" style={styles.fileBtn} onPress={takePhoto}>
+              <TouchableOpacity testID="btn-capture-camera" style={styles.fileBtn} onPress={takePhoto}>
                 <Ionicons name="camera" size={24} color={COLORS.primary} />
                 <Text style={styles.fileBtnText}>Camera</Text>
               </TouchableOpacity>
-              <TouchableOpacity testID="upload-attach" style={styles.fileBtn} onPress={pickFile}>
+              <TouchableOpacity testID="btn-capture-file" style={styles.fileBtn} onPress={pickFile}>
                 <Ionicons name="document-attach" size={24} color={COLORS.primary} />
                 <Text style={styles.fileBtnText}>Attach</Text>
               </TouchableOpacity>
             </View>
+
             {evidence && (
-              <View style={styles.preview}>
+              <View style={styles.preview} testID="evidence-preview-container">
                 {evidence.isImage ? <Image source={{ uri: evidence.uri }} style={styles.img} /> : <Text style={styles.fileAttached}>File Attached: {evidence.name}</Text>}
               </View>
             )}
+
             <Text style={styles.inputLabel}>RESOLUTION NOTES</Text>
             <TextInput 
-              testID="input-notes"
+              testID="input-resolution-notes"
               style={[styles.input, { height: 80 }]} 
               placeholder="Detailed summary of work completed..." 
-              placeholderTextColor="#4A5568"
               multiline 
               value={form.notes} 
               onChangeText={(t) => setForm({...form, notes: t})} 
             />
+
             <Text style={styles.inputLabel}>REMEDIAL ACTIONS TAKEN</Text>
             <TextInput 
-              testID="input-remedial"
+              testID="input-remedial-actions"
               style={[styles.input, { height: 80 }]} 
               placeholder="Describe any fixes or secondary actions..." 
-              placeholderTextColor="#4A5568"
               multiline 
               value={form.remedial} 
               onChangeText={(t) => setForm({...form, remedial: t})} 
             />
+
             <Text style={styles.inputLabel}>DIGITAL SIGNATURE</Text>
             <TextInput 
-              testID="input-signature"
+              testID="input-digital-signature"
               style={styles.input} 
               placeholder="Type Full Name" 
-              placeholderTextColor="#4A5568"
               value={form.signature} 
               onChangeText={(t) => setForm({...form, signature: t})} 
             />
+
             <View style={styles.switchBox}>
               <View>
                 <Text style={styles.switchLabel}>NEXT SERVICE REQUIRED?</Text>
                 {form.nextService && (
-                   <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+                   <TouchableOpacity testID="btn-open-datepicker" onPress={() => setShowDatePicker(true)}>
                       <Text style={styles.dateDisplay}>
                         Scheduled: {displayDateText()}
                       </Text>
@@ -229,25 +232,18 @@ export const ContractorWorkOrders = ({ navigation }: any) => {
                 }} 
               />
             </View>
-            {showDatePicker && (
-              <DateTimePicker
-                value={form.date instanceof Date ? form.date : new Date()}
-                mode="date"
-                display="default"
-                minimumDate={new Date()}
-                onChange={onDateChange}
-              />
-            )}
+
             <TouchableOpacity 
-              testID="btn-submit-resolution"
+              testID="btn-seal-record"
               style={styles.submit} 
               onPress={handleResolution} 
               disabled={isUploading}
             >
               {isUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>SEAL RECORD & COMMIT</Text>}
             </TouchableOpacity>
+
             <TouchableOpacity 
-              testID="btn-close-modal"
+              testID="btn-abort-sign-off"
               onPress={() => setUploadModalVisible(false)} 
               style={styles.cancel}
             >

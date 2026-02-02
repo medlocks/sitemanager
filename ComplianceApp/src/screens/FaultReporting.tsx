@@ -88,6 +88,7 @@ export const FaultReporting = ({ navigation }: any) => {
         <View style={styles.formCard}>
           <Text style={styles.label}>Where is the issue?</Text>
           <TextInput 
+            testID="input-fault-location"
             style={styles.input} 
             placeholder="e.g. Mens Toilets, 2nd Floor" 
             value={location}
@@ -97,6 +98,7 @@ export const FaultReporting = ({ navigation }: any) => {
 
           <Text style={styles.label}>Describe the fault</Text>
           <TextInput 
+            testID="input-fault-description"
             style={[styles.input, { height: 120 }]} 
             placeholder="e.g. Lights not working, leaking tap..." 
             multiline
@@ -106,7 +108,12 @@ export const FaultReporting = ({ navigation }: any) => {
             placeholderTextColor="#A0AEC0"
           />
 
-          <TouchableOpacity style={styles.photoBtn} onPress={takePhoto} disabled={loading}>
+          <TouchableOpacity 
+            testID="btn-fault-camera"
+            style={styles.photoBtn} 
+            onPress={takePhoto} 
+            disabled={loading}
+          >
             <Ionicons name="camera" size={24} color={COLORS.primary} style={{ marginBottom: 5 }} />
             <Text style={styles.photoBtnText}>
               {image ? "PHOTO EVIDENCE ATTACHED" : "ATTACH PHOTO EVIDENCE"}
@@ -114,9 +121,9 @@ export const FaultReporting = ({ navigation }: any) => {
           </TouchableOpacity>
 
           {image && (
-            <View style={styles.previewContainer}>
+            <View style={styles.previewContainer} testID="photo-preview-box">
               <Image source={{ uri: image }} style={styles.preview} />
-              <TouchableOpacity onPress={() => setImage(null)} disabled={loading} style={styles.removeBtn}>
+              <TouchableOpacity testID="btn-remove-photo" onPress={() => setImage(null)} disabled={loading} style={styles.removeBtn}>
                 <Ionicons name="trash-outline" size={16} color={COLORS.secondary} />
                 <Text style={styles.removePhoto}>Remove Photo</Text>
               </TouchableOpacity>
@@ -124,6 +131,7 @@ export const FaultReporting = ({ navigation }: any) => {
           )}
 
           <TouchableOpacity 
+            testID="btn-submit-fault"
             style={[styles.submitBtn, loading && { backgroundColor: COLORS.lightGray }]} 
             onPress={submitFault} 
             disabled={loading}

@@ -54,6 +54,7 @@ export const ContractorAssignment = ({ route, navigation }: any) => {
     <View style={styles.container}>
       <Text style={styles.title}>Dispatch Specialist</Text>
       <TextInput 
+        testID="input-contractor-search"
         style={styles.search} 
         placeholder="Filter by name or specialism (e.g. Gas)..." 
         placeholderTextColor="#999"
@@ -61,13 +62,18 @@ export const ContractorAssignment = ({ route, navigation }: any) => {
         onChangeText={setSearch} 
       />
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color={COLORS.primary} testID="loading-contractors" />
       ) : (
         <FlatList 
+          testID="contractor-list"
           data={filtered} 
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.card} onPress={() => handleAssign(item)}>
+          renderItem={({ item, index }) => (
+            <TouchableOpacity 
+              testID={`contractor-item-${index}`}
+              style={styles.card} 
+              onPress={() => handleAssign(item)}
+            >
               <View>
                 <Text style={styles.name}>{item.name}</Text>
                 <View style={styles.tag}>

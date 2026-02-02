@@ -139,13 +139,17 @@ export const AuditReport = () => {
   const incidentChartData = auditService.getMonthlyTrend(filteredIncidents);
   const accidentChartData = auditService.getMonthlyTrend(filteredAccidents.map(a => ({...a, created_at: a.date_time})));
 
-  const renderItem = ({ item }: { item: any }) => {
+  const renderItem = ({ item, index }: { item: any, index: number }) => {
     const isAsset = viewMode === 'Assets';
     const isAccident = viewMode === 'Accidents';
     const statusColor = (item.status === 'Resolved' || item.status === 'Compliant') ? '#00C853' : '#FFAB00';
     
     return (
-      <TouchableOpacity style={styles.logCard} onPress={() => setSelectedItem(item)}>
+      <TouchableOpacity 
+        testID={`audit-log-item-${index}`}
+        style={styles.logCard} 
+        onPress={() => setSelectedItem(item)}
+      >
         <View style={styles.logHeader}>
           <Text style={styles.logDate}>
             {isAccident ? formatDate(item.date_time) : 
@@ -173,6 +177,7 @@ export const AuditReport = () => {
             {(['Analytics', 'Incidents', 'Assets', 'Accidents'] as const).map(tab => (
               <TouchableOpacity 
                 key={tab} 
+                testID={`audit-tab-${tab}`}
                 onPress={() => setViewMode(tab)} 
                 style={[styles.tab, viewMode === tab && styles.tabActive, { minWidth: 90, marginHorizontal: 4 }]}
               >
@@ -185,12 +190,12 @@ export const AuditReport = () => {
 
       {viewMode !== 'Assets' && viewMode !== 'Analytics' && (
         <View style={styles.filterBar}>
-          <TouchableOpacity style={styles.dateBtn} onPress={() => setShowPicker('from')}>
+          <TouchableOpacity testID="btn-filter-from" style={styles.dateBtn} onPress={() => setShowPicker('from')}>
             <Text style={styles.dateBtnLabel}>FROM</Text>
             <Text style={styles.dateBtnVal}>{fromDate.toLocaleDateString('en-GB')}</Text>
           </TouchableOpacity>
           <Text style={styles.dateDivider}>→</Text>
-          <TouchableOpacity style={styles.dateBtn} onPress={() => setShowPicker('to')}>
+          <TouchableOpacity testID="btn-filter-to" style={styles.dateBtn} onPress={() => setShowPicker('to')}>
             <Text style={styles.dateBtnLabel}>TO</Text>
             <Text style={styles.dateBtnVal}>{toDate.toLocaleDateString('en-GB')}</Text>
           </TouchableOpacity>
@@ -199,6 +204,7 @@ export const AuditReport = () => {
 
       {showPicker && (
         <DateTimePicker
+          testID="audit-date-picker"
           value={showPicker === 'from' ? fromDate : toDate}
           mode="date"
           onChange={(event, date) => {
@@ -213,8 +219,8 @@ export const AuditReport = () => {
       ) : (
         <View style={styles.content}>
           {viewMode === 'Analytics' ? (
-            <ScrollView style={{padding: 20}}>
-              <Text style={styles.sectionTitle}>Incident Volume (Faults/Hazards)</Text>
+            <ScrollView style={{padding: 20}} testID="audit-analytics-view">
+              <Text style={styles.sectionTitle} testID="incident-volume">Incident Volume (Faults/Hazards)</Text>
               <BarChart
                 data={{ labels: incidentChartData.labels, datasets: [{ data: incidentChartData.values }] }}
                 width={screenWidth - 40} height={200}
@@ -222,7 +228,7 @@ export const AuditReport = () => {
                 chartConfig={chartConfig} style={styles.chartStyle} fromZero
               />
               <View style={{marginTop: 30}}>
-                <Text style={[styles.sectionTitle, {color: COLORS.secondary}]}>Accident Volume (HSE Logbook)</Text>
+                <Text style={[styles.sectionTitle, {color: COLORS.secondary}]} testID="accident-volume">Accident Volume (HSE Logbook)</Text>
                 <BarChart
                     data={{ labels: accidentChartData.labels, datasets: [{ data: accidentChartData.values }] }}
                     width={screenWidth - 40} height={200}
@@ -233,8 +239,9 @@ export const AuditReport = () => {
               </View>
             </ScrollView>
           ) : (
-            <View style={{ flex: 1, padding: 20 }}>
+            <View style={{ flex: 1, padding: 20 }} testID={`audit-list-view-${viewMode}`}>
               <TextInput 
+                testID="audit-search-input"
                 style={styles.searchBar} 
                 placeholder={`Search ${viewMode}...`} 
                 value={searchQuery} 
@@ -244,7 +251,7 @@ export const AuditReport = () => {
               <FlatList
                 data={viewMode === 'Assets' ? filteredAssets : viewMode === 'Accidents' ? filteredAccidents : filteredIncidents}
                 keyExtractor={item => item.id}
-                renderItem={renderItem}
+                renderItem={({item, index}) => renderItem({item, index})}
                 ListEmptyComponent={<Text style={styles.emptyTxt}>No statutory records found.</Text>}
               />
             </View>
@@ -253,10 +260,10 @@ export const AuditReport = () => {
       )}
 
       <Modal visible={!!selectedItem} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={{flex: 1, backgroundColor: '#F4F7FA'}}>
+        <SafeAreaView style={{flex: 1, backgroundColor: '#F4F7FA'}} testID="audit-modal-detail">
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Statutory Record Detail</Text>
-            <TouchableOpacity onPress={() => setSelectedItem(null)}>
+            <TouchableOpacity testID="btn-close-audit-modal" onPress={() => setSelectedItem(null)}>
               <Text style={styles.closeTxt}>DONE</Text>
             </TouchableOpacity>
           </View>
@@ -287,7 +294,7 @@ export const AuditReport = () => {
             {/* CORE DATA */}
             <View style={styles.detailSection}>
               <Text style={styles.label}>CORE DETAILS</Text>
-              <Text style={styles.value}>{selectedItem?.asset_name || selectedItem?.description || selectedItem?.injured_person_name}</Text>
+              <Text style={styles.value} testID="audit-detail-title">{selectedItem?.asset_name || selectedItem?.description || selectedItem?.injured_person_name}</Text>
               <View style={styles.locationRow}>
                 <Ionicons name="location" size={14} color={COLORS.textLight} />
                 <Text style={styles.locationText}>{selectedItem?.location || 'Not Specified'}</Text>
@@ -307,7 +314,7 @@ export const AuditReport = () => {
               ) : evidenceUri ? (
                 <View>
                   {evidenceUri.toLowerCase().includes('.pdf') ? (
-                    <TouchableOpacity style={styles.pdfCard} onPress={() => openEvidence()}>
+                    <TouchableOpacity testID="btn-view-statutory-pdf" style={styles.pdfCard} onPress={() => openEvidence()}>
                       <Ionicons name="document-text" size={32} color="#FF4D4F" />
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={styles.pdfText}>View Statutory PDF</Text>
@@ -316,7 +323,7 @@ export const AuditReport = () => {
                       <Ionicons name="open-outline" size={16} color={COLORS.textLight} />
                     </TouchableOpacity>
                   ) : (
-                    <TouchableOpacity onPress={() => openEvidence()} style={styles.imageContainer}>
+                    <TouchableOpacity testID="btn-view-evidence-img" onPress={() => openEvidence()} style={styles.imageContainer}>
                       <Image 
                         source={{ uri: evidenceUri }} 
                         style={styles.evidenceImage} 
@@ -353,6 +360,7 @@ export const AuditReport = () => {
                       <Text style={styles.historyNotes}>{log.notes || 'Routine check performed.'}</Text>
                       {log.certificate_url && (
                         <TouchableOpacity 
+                          testID={`btn-view-certificate-${index}`}
                           style={styles.historyLink} 
                           onPress={() => {
                             const { data } = supabase.storage.from('incident-evidence').getPublicUrl(log.certificate_url);
@@ -380,7 +388,7 @@ export const AuditReport = () => {
                 {selectedItem?.injury_description && (
                    <>
                     <Text style={styles.subLabel}>INJURY DESCRIPTION</Text>
-                    <Text style={styles.notesText}>{selectedItem.injury_description}</Text>
+                    <Text style={styles.notesText} testID="audit-injury-desc">{selectedItem.injury_description}</Text>
                     <Text style={styles.subLabel}>TREATMENT</Text>
                     <Text style={styles.notesText}>{selectedItem.treatment_given || 'None recorded'}</Text>
                    </>
@@ -389,7 +397,7 @@ export const AuditReport = () => {
                 {selectedItem?.resolution_notes && (
                   <>
                     <Text style={styles.subLabel}>RESOLUTION NOTES</Text>
-                    <Text style={styles.notesText}>{selectedItem.resolution_notes}</Text>
+                    <Text style={styles.notesText} testID="audit-resolution-notes">{selectedItem.resolution_notes}</Text>
                   </>
                 )}
 
@@ -411,7 +419,11 @@ export const AuditReport = () => {
       </Modal>
 
       {viewMode !== 'Analytics' && (
-        <TouchableOpacity style={styles.exportBtn} onPress={() => auditService.generateAuditPDF(viewMode, viewMode === 'Assets' ? filteredAssets : filteredIncidents, viewMode === 'Assets')}>
+        <TouchableOpacity 
+          testID="btn-export-audit-pdf"
+          style={styles.exportBtn} 
+          onPress={() => auditService.generateAuditPDF(viewMode, viewMode === 'Assets' ? filteredAssets : filteredIncidents, viewMode === 'Assets')}
+        >
           <Text style={styles.exportTxt}>GENERATE {viewMode.toUpperCase()} PDF</Text>
         </TouchableOpacity>
       )}

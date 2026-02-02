@@ -1,0 +1,34 @@
+appId: com.blakemedlock.ComplianceApp
+---
+- runFlow:
+    file: subflow_login.yaml
+    env:
+      USER_EMAIL: "manager@test.co.uk"
+      USER_PASS: "password"
+
+- tapOn: { id: "menu-item-BuildingServices" }
+- tapOn: { id: "btn-nav-add-asset" }
+- assertVisible: "New Asset"
+
+- tapOn: { id: "input-asset-name" }
+- inputText: "Secure Server Rack 09"
+- tapOn: { point: "50%, 15%" }
+
+- tapOn: { id: "input-asset-category" }
+- inputText: "IT Infrastructure"
+- tapOn: { point: "50%, 15%" }
+
+- tapOn: { id: "input-asset-regulation" }
+- inputText: "ISO 27001"
+- tapOn: { point: "50%, 15%" }
+
+- tapOn: { id: "input-asset-location" }
+- inputText: "Underground Bunker 2"
+- tapOn: { point: "50%, 15%" }
+
+- hideKeyboard
+- tapOn: { id: "btn-save-asset" }
+
+- extendedWaitUntil:
+    visible: "Asset Register"
+    timeout: 10000

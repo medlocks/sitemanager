@@ -1,0 +1,19 @@
+appId: com.blakemedlock.ComplianceApp
+---
+- runFlow:
+    file: subflow_login.yaml
+    env:
+      USER_EMAIL: "employee@test.co.uk"
+      USER_PASS: "password"
+- assertVisible: "COMMAND DASHBOARD"
+- tapOn: { id: "menu-item-FaultReporting" }
+- inputText: { id: "input-fault-location", text: "North Wing - Block C" }
+- tapOn:
+    point: "20%, 10%"
+- tapOn: { id: "input-fault-description" }
+- inputText: "Exposed wiring discovered behind server rack 4."
+- tapOn:
+    point: "20%, 10%"
+- tapOn: { id: "btn-submit-fault" }
+- assertVisible: "The report is now live in the central audit vault."
+- tapOn: "OK"

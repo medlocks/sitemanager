@@ -1,0 +1,32 @@
+appId: com.blakemedlock.ComplianceApp
+---
+- runFlow:
+    file: subflow_login.yaml
+    env:
+      USER_EMAIL: "employee@test.co.uk"
+      USER_PASS: "password"
+
+- tapOn: { id: "menu-item-LogAccident" }
+
+# --- FIELD 1: Injured Name ---
+- tapOn: { id: "input-injured-name" }
+- inputText: "John Doe"
+
+# --- FIELD 2: Location ---
+# You MUST tap the box first to move the cursor!
+- tapOn: { id: "input-accident-location" } 
+- inputText: "Loading Bay A"
+- tapOn: { point: "50%, 15%" } # Dismiss keyboard
+
+# --- FIELD 3: Description ---
+- tapOn: { id: "input-injury-description" }
+- inputText: "Slipped on oily surface."
+- tapOn: { point: "50%, 15%" } # Dismiss keyboard
+
+# --- RIDDOR SWITCH ---
+- scroll # Just in case it's off-screen
+- tapOn: { id: "switch-riddor" }
+
+- tapOn: { id: "btn-submit-accident" }
+- assertVisible: "Entry Sealed"
+- tapOn: "OK"

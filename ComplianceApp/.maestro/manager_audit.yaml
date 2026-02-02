@@ -1,0 +1,28 @@
+appId: com.blakemedlock.ComplianceApp
+---
+- runFlow:
+    file: subflow_login.yaml
+    env:
+      USER_EMAIL: "manager@test.co.uk"
+      USER_PASS: "password"
+
+- assertVisible: "COMMAND DASHBOARD"
+- tapOn: { id: "menu-item-AuditReport" }
+
+- assertVisible: "Statutory Audit Vault"
+- tapOn: { id: "audit-tab-Analytics" }
+
+- extendedWaitUntil:
+    visible: { id: "incident-volume" }
+    timeout: 10000
+
+- assertVisible: { id: "accident-volume" }
+
+- tapOn: { id: "audit-tab-Accidents" }
+
+- tapOn: { id: "audit-log-item-0" }
+- assertVisible: "LATEST DIGITAL EVIDENCE"
+
+- tapOn: { id: "btn-close-audit-modal" }
+- tapOn: { id: "btn-export-audit-pdf" }
+- assertVisible: "GENERATE ACCIDENTS PDF"

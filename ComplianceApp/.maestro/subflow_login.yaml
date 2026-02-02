@@ -1,0 +1,28 @@
+appId: com.blakemedlock.ComplianceApp
+---
+- launchApp: { clearState: true }
+
+- extendedWaitUntil:
+    visible: "Email Address"
+    timeout: 15000
+
+- tapOn: "Email Address"
+- inputText: ${USER_EMAIL}
+
+- tapOn: "Password"
+- inputText: ${USER_PASS}
+
+- tapOn:
+    point: "50%, 10%"
+
+- extendedWaitUntil:
+    visible: "Email Address"
+    timeout: 40000
+
+- tapOn: {id: "login-submit-btn"}
+
+- extendedWaitUntil:
+    visible: "Statutory Privacy Protocol"
+    timeout: 60000 
+
+- tapOn: { point: "50%, 80%" }
