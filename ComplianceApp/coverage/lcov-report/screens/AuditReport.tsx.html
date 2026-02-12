@@ -856,7 +856,7 @@ export const AuditReport = <span class="cstat-no" title="statement not covered" 
         &lt;Text style={styles.logDesc}&gt;
             {isAccident ? `Injured: ${item.injured_person_name}` : isAsset ? item.asset_name : item.description}
         &lt;/Text&gt;
-        &lt;Text style={styles.logLoc}&gt;📍 {item.location}&lt;/Text&gt;
+        &lt;Text style={styles.logLoc}&gt; {item.location}&lt;/Text&gt;
       &lt;/TouchableOpacity&gt;
     );
   };

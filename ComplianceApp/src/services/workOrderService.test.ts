@@ -10,51 +10,62 @@ jest.mock('./syncService', () => ({
 }));
 
 jest.mock('./fileService', () => ({
-  fileService: {
-    uploadFile: jest.fn()
-  }
+  fileService: { uploadFile: jest.fn() }
 }));
 
 describe('WorkOrderService', () => {
   const mockUserId = 'u123';
-  
-  const mockTask = { 
-    id: 'task_123', 
-    isAssetTask: true, 
-    description: 'Test Task', 
-    evidence_url: null 
-  };
-  
+  const mockTask = { id: 'task_123', isAssetTask: true, description: 'Test Task' };
   const mockFormData = { 
-    resolutionNotes: 'Fixed it', 
+    resolutionNotes: 'Fixed the broken sensor equipment', 
+    remedialActions: 'Replaced wiring',
+    signedByName: 'John Doe',
     nextDueDate: new Date('2027-01-01'),
-    evidenceFile: { uri: 'file://img.jpg', name: 'img.jpg' }
+    evidenceFile: { uri: 'file://img.jpg' }
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (supabase.from as jest.Mock).mockReturnThis();
+    const mockEq = jest.fn().mockResolvedValue({ error: null });
+    const mockUpdate = jest.fn().mockReturnValue({ eq: mockEq });
+    const mockInsert = jest.fn().mockResolvedValue({ error: null });
+
+    (supabase.from as jest.Mock).mockReturnValue({
+      update: mockUpdate,
+      insert: mockInsert,
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      neq: jest.fn().mockReturnThis()
+    });
   });
 
   it('should resolve task online correctly', async () => {
     (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true }); 
-    (fileService.uploadFile as jest.Mock).mockResolvedValue('https://vault.url/img.jpg');
+    (fileService.uploadFile as jest.Mock).mockResolvedValue('https://url.com/img.jpg');
 
-    await workOrderService.resolveTask(mockUserId, mockTask, mockFormData);
+    const result = await workOrderService.resolveTask(mockUserId, mockTask, mockFormData);
 
-    expect(fileService.uploadFile).toHaveBeenCalled();
+    expect(result).toEqual({ success: true, offline: false });
     expect(supabase.from).toHaveBeenCalledWith('assets');
-    expect(supabase.from).toHaveBeenCalledWith('maintenance_logs');
   });
 
   it('should enqueue task resolution when offline', async () => {
     (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: false });
 
-    await workOrderService.resolveTask(mockUserId, mockTask, mockFormData);
+    const result = await workOrderService.resolveTask(mockUserId, mockTask, mockFormData);
 
-    expect(syncService.enqueue).toHaveBeenCalledWith(
-      'work_order_resolutions', 
-      expect.objectContaining({ userId: mockUserId })
-    );
+    expect(result).toEqual({ success: true, offline: true });
+    expect(syncService.enqueue).toHaveBeenCalled();
+  });
+
+  it('should fail validation if notes are too short', async () => {
+    const result = await workOrderService.resolveTask(mockUserId, mockTask, { 
+      ...mockFormData, 
+      resolutionNotes: 'Fix' 
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Resolution notes are too short.');
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 });

@@ -1,9 +1,19 @@
 import { supabase } from '../lib/supabase';
-import NetInfo from '@react-native-community/netinfo';
-import { syncService } from './syncService';
+
+export interface ServiceReport {
+  id: string;
+  assetName: string;
+  type: string;
+  regulation: string;
+  location: string;
+  status: string;
+  lastServiceDate: string | null;
+  nextServiceDueDate: string | null;
+  minClearance: string | number | null;
+}
 
 export const buildingService = {
-  async getServiceReports() {
+  async getServiceReports(): Promise<ServiceReport[]> {
     const { data, error } = await supabase
       .from('assets')
       .select('*')

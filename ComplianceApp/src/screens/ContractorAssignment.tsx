@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { contractorService, Contractor } from '../services/contractorService';
-import { COLORS, TYPOGRAPHY, SHADOWS } from '../theme';
+import { COLORS, TYPOGRAPHY, SHADOWS, TOUCH_TARGETS, SPACING } from '../theme';
 
 export const ContractorAssignment = ({ route, navigation }: any) => {
   const { incidentId, isAsset } = route.params;
@@ -52,39 +52,50 @@ export const ContractorAssignment = ({ route, navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Dispatch Specialist</Text>
+      <Text style={styles.title} accessibilityRole="header">Dispatch Specialist</Text>
       <TextInput 
         testID="input-contractor-search"
         style={styles.search} 
         placeholder="Filter by name or specialism (e.g. Gas)..." 
-        placeholderTextColor="#999"
+        placeholderTextColor={COLORS.textLight}
         value={search} 
         onChangeText={setSearch} 
+        accessibilityLabel="Search Contractors"
+        accessibilityHint="Filters the list of specialists by name or trade"
       />
+      
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.primary} testID="loading-contractors" />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={COLORS.primary} testID="loading-contractors" />
+        </View>
       ) : (
         <FlatList 
           testID="contractor-list"
           data={filtered} 
           keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
           renderItem={({ item, index }) => (
             <TouchableOpacity 
               testID={`contractor-item-${index}`}
               style={styles.card} 
               onPress={() => handleAssign(item)}
+              accessibilityRole="button"
+              accessibilityLabel={`Assign ${item.name}, ${item.specialism || 'General'} specialist`}
+              accessibilityHint="Dispatches the work order to this contractor"
             >
-              <View>
+              <View style={styles.info}>
                 <Text style={styles.name}>{item.name}</Text>
                 <View style={styles.tag}>
-                  <Text style={styles.tagTxt}>{item.specialism || 'General'}</Text>
+                  <Text style={styles.tagTxt}>{item.specialism?.toUpperCase() || 'GENERAL'}</Text>
                 </View>
               </View>
               <Text style={styles.assignLink}>SELECT →</Text>
             </TouchableOpacity>
           )} 
           ListEmptyComponent={
-            <Text style={styles.emptyTxt}>No approved specialists found.</Text>
+            <Text style={styles.emptyTxt} accessibilityRole="text">
+              No approved specialists found.
+            </Text>
           }
         />
       )}
@@ -93,13 +104,79 @@ export const ContractorAssignment = ({ route, navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: COLORS.background },
-  title: { ...TYPOGRAPHY.header, color: COLORS.primary, marginBottom: 15 },
-  search: { backgroundColor: '#fff', padding: 12, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#eee', color: '#000' },
-  card: { backgroundColor: '#fff', padding: 20, borderRadius: 12, marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', ...SHADOWS.light },
-  name: { fontWeight: 'bold', fontSize: 16 },
-  tag: { backgroundColor: COLORS.primary, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, marginTop: 4, alignSelf: 'flex-start' },
-  tagTxt: { color: '#fff', fontSize: 9, fontWeight: 'bold' },
-  assignLink: { color: COLORS.primary, fontWeight: 'bold' },
-  emptyTxt: { textAlign: 'center', color: '#999', marginTop: 20 }
+  container: { 
+    flex: 1, 
+    paddingHorizontal: SPACING.m, 
+    backgroundColor: COLORS.background 
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  title: { 
+    ...TYPOGRAPHY.header, 
+    color: COLORS.primary, 
+    marginVertical: SPACING.m 
+  },
+  search: { 
+    backgroundColor: COLORS.white, 
+    padding: SPACING.m, 
+    borderRadius: 12, 
+    marginBottom: SPACING.m, 
+    borderWidth: 2, 
+    borderColor: COLORS.lightGray, 
+    color: COLORS.text,
+    minHeight: TOUCH_TARGETS.min,
+    ...TYPOGRAPHY.body
+  },
+  list: {
+    paddingBottom: SPACING.xl
+  },
+  card: { 
+    backgroundColor: COLORS.white, 
+    padding: SPACING.m, 
+    borderRadius: 12, 
+    marginBottom: SPACING.s, 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    minHeight: TOUCH_TARGETS.min * 1.5,
+    ...SHADOWS.light,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray
+  },
+  info: {
+    flex: 1
+  },
+  name: { 
+    ...TYPOGRAPHY.subheader,
+    color: COLORS.text 
+  },
+  tag: { 
+    backgroundColor: COLORS.primary, 
+    paddingHorizontal: 10, 
+    paddingVertical: 4, 
+    borderRadius: 6, 
+    marginTop: 8, 
+    alignSelf: 'flex-start' 
+  },
+  tagTxt: { 
+    color: COLORS.white, 
+    fontSize: 12, 
+    fontWeight: '900',
+    letterSpacing: 0.5 
+  },
+  assignLink: { 
+    ...TYPOGRAPHY.body,
+    color: COLORS.primary, 
+    fontWeight: '800',
+    marginLeft: SPACING.s
+  },
+  emptyTxt: { 
+    textAlign: 'center', 
+    ...TYPOGRAPHY.body,
+    color: COLORS.textLight, 
+    marginTop: SPACING.xl 
+  }
 });

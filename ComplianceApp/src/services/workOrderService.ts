@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import NetInfo from '@react-native-community/netinfo';
 import { syncService } from './syncService';
 import { fileService } from './fileService';
+import { InputValidator } from '../utils/InputValidator';
 
 export const workOrderService = {
   async getAssignedTasks(userId: string) {
@@ -32,6 +33,17 @@ export const workOrderService = {
   },
 
   async resolveTask(userId: string, task: any, formData: any) {
+    const cleanNotes = InputValidator.sanitize(formData.resolutionNotes);
+    const cleanActions = InputValidator.sanitize(formData.remedialActions);
+    const cleanSignedBy = InputValidator.sanitize(formData.signedByName);
+
+    if (cleanNotes.length < 5) {
+      return { success: false, error: 'Resolution notes are too short.' };
+    }
+    if (!cleanSignedBy) {
+      return { success: false, error: 'Signature name is required.' };
+    }
+
     const state = await NetInfo.fetch();
     const nowISO = new Date().toISOString();
     const todayStr = nowISO.split('T')[0];
@@ -39,25 +51,45 @@ export const workOrderService = {
     let nextDueStr = null;
     if (formData.nextDueDate) {
       const d = new Date(formData.nextDueDate);
-      nextDueStr = !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : null;
+      if (!isNaN(d.getTime())) {
+        nextDueStr = d.toISOString().split('T')[0];
+        
+        const validation = InputValidator.validateAsset('Task', nextDueStr);
+        if (!validation.isValid) {
+           return { success: false, error: validation.errors[0] };
+        }
+      }
     }
+
+    const cleanFormData = {
+      ...formData,
+      resolutionNotes: cleanNotes,
+      remedialActions: cleanActions,
+      signedByName: cleanSignedBy,
+      resolvedAt: nowISO,
+      nextDueStr
+    };
 
     if (!state.isConnected) {
       await syncService.enqueue('work_order_resolutions', {
         userId,
         taskId: task.id,
         isAssetTask: task.isAssetTask,
-        formData: { ...formData, resolvedAt: nowISO, nextDueStr }
+        formData: cleanFormData
       });
-      return { offline: true };
+      return { success: true, offline: true };
     }
 
     let publicUrl = task.evidence_url || task.resolved_image_url;
 
     if (formData.evidenceFile) {
-      const fileExt = formData.evidenceFile.uri.toLowerCase().endsWith('.pdf') ? 'pdf' : 'jpg';
-      const fileName = `res_${task.id}_${Date.now()}.${fileExt}`;
-      publicUrl = await fileService.uploadFile('incident-evidence', fileName, formData.evidenceFile.uri);
+      try {
+        const fileExt = formData.evidenceFile.uri.toLowerCase().endsWith('.pdf') ? 'pdf' : 'jpg';
+        const fileName = `res_${task.id}_${Date.now()}.${fileExt}`;
+        publicUrl = await fileService.uploadFile('incident-evidence', fileName, formData.evidenceFile.uri);
+      } catch (e) {
+        return { success: false, error: 'Failed to upload evidence.' };
+      }
     }
 
     if (task.isAssetTask) {
@@ -69,7 +101,7 @@ export const workOrderService = {
           next_service_due: nextDueStr,
           evidence_url: publicUrl,
           signed_off_by: userId,
-          signed_by_name: formData.signedByName
+          signed_by_name: cleanSignedBy
         })
         .eq('id', task.id);
 
@@ -81,11 +113,11 @@ export const workOrderService = {
         service_type: task.type || 'Statutory Maintenance',
         service_date: nowISO,
         next_due_date: nextDueStr || todayStr,
-        notes: formData.resolutionNotes,
-        remedial_actions: formData.remedialActions,
+        notes: cleanNotes,
+        remedial_actions: cleanActions,
         evidence_url: publicUrl,
-        certificate_url: publicUrl, // Matches your schema
-        signature_url: formData.signedByName
+        certificate_url: publicUrl,
+        signature_url: cleanSignedBy
       }]);
       
       if (logError) console.error("Maintenance Log Error:", logError);
@@ -95,9 +127,9 @@ export const workOrderService = {
         .from('incidents')
         .update({ 
           status: 'Resolved', 
-          resolution_notes: formData.resolutionNotes,
-          remedial_actions: formData.remedialActions,
-          signed_off_by: formData.signedByName,
+          resolution_notes: cleanNotes,
+          remedial_actions: cleanActions,
+          signed_off_by: cleanSignedBy,
           resolved_image_url: publicUrl,
           resolved_at: nowISO
         })
@@ -105,6 +137,7 @@ export const workOrderService = {
 
       if (resolveError) throw resolveError;
     }
-    return true;
+    
+    return { success: true, offline: false };
   }
 };

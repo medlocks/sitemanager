@@ -26,8 +26,7 @@ appId: com.blakemedlock.ComplianceApp
 - inputText: "Underground Bunker 2"
 - tapOn: { point: "50%, 15%" }
 
-- hideKeyboard
-- tapOn: { id: "btn-save-asset" }
+- tapOn: "SAVE RECORD"
 
 - extendedWaitUntil:
     visible: "Asset Register"

@@ -8,25 +8,21 @@ appId: com.blakemedlock.ComplianceApp
 
 - tapOn: { id: "menu-item-LogAccident" }
 
-# --- FIELD 1: Injured Name ---
 - tapOn: { id: "input-injured-name" }
 - inputText: "John Doe"
 
-# --- FIELD 2: Location ---
-# You MUST tap the box first to move the cursor!
 - tapOn: { id: "input-accident-location" } 
 - inputText: "Loading Bay A"
-- tapOn: { point: "50%, 15%" } # Dismiss keyboard
+- tapOn: { point: "50%, 15%" } 
 
-# --- FIELD 3: Description ---
 - tapOn: { id: "input-injury-description" }
 - inputText: "Slipped on oily surface."
-- tapOn: { point: "50%, 15%" } # Dismiss keyboard
+- tapOn: { point: "50%, 15%" } 
 
-# --- RIDDOR SWITCH ---
-- scroll # Just in case it's off-screen
 - tapOn: { id: "switch-riddor" }
 
-- tapOn: { id: "btn-submit-accident" }
+- tapOn: 
+    point: "50%, 90%"
+
 - assertVisible: "Entry Sealed"
 - tapOn: "OK"

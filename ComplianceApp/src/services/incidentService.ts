@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { fileService } from './fileService';
 import NetInfo from '@react-native-community/netinfo';
 import { syncService } from './syncService';
+import { InputValidator } from '../utils/InputValidator';
 
 export interface Incident {
   id: string;
@@ -10,7 +11,7 @@ export interface Incident {
   status: 'Pending' | 'Assigned' | 'Resolved' | 'High Risk';
   type: 'Reactive' | 'Planned' | 'Statutory';
   created_at: string;
-  image_url?: string;
+  image_url?: string | null;
   user_id?: string;
   resolved_at?: string;
   resolved_image_url?: string;
@@ -37,11 +38,20 @@ export const incidentService = {
     userId?: string, 
     status: Incident['status'] = 'Pending'
   ) {
-    const dataToInsert: any = {
-      description,
-      location,
+    const cleanDescription = InputValidator.sanitize(description);
+    const cleanLocation = InputValidator.sanitize(location);
+
+    const validation = InputValidator.validateIncident(cleanDescription, cleanLocation);
+
+    if (!validation.isValid) {
+      return { success: false, error: validation.errors[0] };
+    }
+
+    const dataToInsert = {
+      description: cleanDescription,
+      location: cleanLocation,
       status,
-      type: description.includes('FRA') ? 'Statutory' : 'Reactive',
+      type: cleanDescription.includes('FRA') ? 'Statutory' : 'Reactive',
       user_id: userId,
       created_at: new Date().toISOString()
     };
@@ -50,13 +60,16 @@ export const incidentService = {
 
     if (!state.isConnected) {
       await syncService.enqueue('incidents', { ...dataToInsert, localImageUri: imageUri });
-      return { offline: true };
+      return { success: true, offline: true, message: 'Incident saved to offline queue' };
     }
 
     let imageUrl = null;
     if (imageUri) {
-      // Logic Fix: uploadResult is now strictly a string (the path)
-      imageUrl = await fileService.uploadIncidentEvidence(userId || 'anon', imageUri);
+      try {
+        imageUrl = await fileService.uploadIncidentEvidence(userId || 'anon', imageUri);
+      } catch (uploadError) {
+        return { success: false, error: 'Failed to upload image.' };
+      }
     }
 
     const { data, error } = await supabase
@@ -65,7 +78,10 @@ export const incidentService = {
       .select()
       .single();
 
-    if (error) throw error;
-    return data;
+    if (error) {
+      return { success: false, error: 'Database error. Please try again.' };
+    }
+
+    return { success: true, data, offline: false };
   }
 };

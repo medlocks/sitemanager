@@ -1,11 +1,22 @@
 import { Alert, Clipboard } from 'react-native';
 import { supabase } from '../lib/supabase';
+import { InputValidator } from '../utils/InputValidator';
 
 export const privacyService = {
   async downloadMyData(userId: string) {
     try {
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      const { data: assignments } = await supabase.from('incidents').select('*').eq('user_id', userId);
+      const cleanUserId = InputValidator.sanitize(userId);
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', cleanUserId)
+        .single();
+
+      const { data: assignments } = await supabase
+        .from('incidents')
+        .select('*')
+        .eq('user_id', cleanUserId);
 
       const exportData = {
         generatedAt: new Date().toISOString(),

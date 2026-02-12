@@ -1,24 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '../theme';
+import { COLORS, TYPOGRAPHY, SPACING, TOUCH_TARGETS, SHADOWS } from '../theme';
+import { useAuth } from '../context/AuthContext';
 
-export const Dashboard = ({ navigation }: any) => {
+interface Props {
+  navigation: any;
+}
+
+export const Dashboard = ({ navigation }: Props) => {
   const { user } = useAuth();
   const [feed, setFeed] = useState<any[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const isManager = user?.role === 'Manager';
+  const menuItems = [
+    { id: '1', title: 'Report Fault / Hazard', icon: 'alert-circle-outline', screen: 'FaultReporting' },
+    { id: '2', title: 'Log Statutory Accident', icon: 'medical-outline', screen: 'LogAccident' },
+    { id: '3', title: 'Building Assets', icon: 'construct-outline', screen: 'BuildingServices' },
+    { id: '4', title: 'Audit Evidence', icon: 'shield-checkmark-outline', screen: 'AuditReport' },
+    { id: '5', title: 'Specialist Verification', icon: 'people-outline', screen: 'QualificationTracker' },
+  ];
 
   const fetchData = async () => {
-    if (!isManager) {
-      setLoading(false);
-      return;
-    }
-    
     try {
       const [feedRes, countRes] = await Promise.all([
         supabase.from('incidents').select('*').order('created_at', { ascending: false }).limit(8),
@@ -27,7 +32,7 @@ export const Dashboard = ({ navigation }: any) => {
       setFeed(feedRes.data || []);
       setPendingCount(countRes.count || 0);
     } catch (error) {
-      console.error("Dashboard Fetch Error:", error);
+      console.warn("Dashboard sync failed - showing cached data if available");
     } finally {
       setLoading(false);
     }
@@ -36,175 +41,175 @@ export const Dashboard = ({ navigation }: any) => {
   useEffect(() => {
     fetchData();
 
-    if (isManager) {
-      const channel = supabase.channel('realtime_incidents')
-        .on(
-          'postgres_changes', 
-          { event: '*', schema: 'public', table: 'incidents' }, 
-          (payload) => {
-            if (payload.eventType === 'INSERT') {
-              setFeed(prev => [payload.new, ...prev].slice(0, 8));
-              if (payload.new.status === 'Pending') setPendingCount(c => c + 1);
-            } 
-            else if (payload.eventType === 'UPDATE') {
-              setFeed(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
-              fetchData(); 
-            }
-            else if (payload.eventType === 'DELETE') {
-              setFeed(prev => prev.filter(item => item.id !== payload.old.id));
-              fetchData();
-            }
+    const channel = supabase.channel('realtime_incidents')
+      .on(
+        'postgres_changes', 
+        { event: '*', schema: 'public', table: 'incidents' }, 
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setFeed(prev => [payload.new, ...prev].slice(0, 8));
+            if (payload.new.status === 'Pending') setPendingCount(c => c + 1);
+          } 
+          else if (payload.eventType === 'UPDATE') {
+            setFeed(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
+            fetchData();
           }
-        )
-        .subscribe();
+          else if (payload.eventType === 'DELETE') {
+            setFeed(prev => prev.filter(item => item.id !== payload.old.id));
+            fetchData();
+          }
+        }
+      )
+      .subscribe();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [isManager]);
-
-  const menuItems = [
-    { id: '1', title: 'Report Fault / Hazard', icon: 'alert-circle-outline', screen: 'FaultReporting', roles: ['Manager', 'Employee'] },
-    { id: '2', title: 'Log Statutory Accident', icon: 'medical-outline', screen: 'LogAccident', roles: ['Manager', 'Employee'] },
-    { id: '3', title: 'Building Assets', icon: 'construct-outline', screen: 'BuildingServices', roles: ['Manager'] },
-    { id: '4', title: 'Audit Evidence', icon: 'shield-checkmark-outline', screen: 'AuditReport', roles: ['Manager'] },
-    { id: '5', title: 'Specialist Verification', icon: 'people-outline', screen: 'QualificationTracker', roles: ['Manager'] },
-    { id: '6', title: 'Security Protocols', icon: 'options-outline', screen: 'SiteSettings', roles: ['Manager'] },
-  ];
-
-  const filteredItems = menuItems.filter(item => item.roles.includes(user?.role || ''));
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.hero}>
-          <Text style={styles.greeting}>ACCESS LEVEL: {user?.role}</Text>
-          <Text style={styles.name}>{user?.name}</Text>
-        </View>
-        
-        {isManager && pendingCount > 0 && (
+    <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.hero} accessibilityRole="summary">
+        <Text style={styles.greeting}>ACCESS LEVEL: {user?.role}</Text>
+        <Text style={styles.name} accessibilityRole="header">{user?.name}</Text>
+      </View>
+      
+      {pendingCount > 0 && (
+        <TouchableOpacity 
+          testID="manager-pending-banner"
+          style={styles.summaryBanner}
+          onPress={() => navigation.navigate('AuditReport')}
+          accessibilityRole="button"
+          accessibilityLabel={`Action Required: ${pendingCount} pending tasks`}
+          accessibilityHint="Navigates to the audit report to resolve pending items"
+        >
+          <Ionicons name="notifications" size={24} color={COLORS.white} />
+          <Text style={styles.summaryText}>
+            ACTION REQUIRED: {pendingCount} PENDING TASKS
+          </Text>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.white} style={{marginLeft: 'auto'}} />
+        </TouchableOpacity>
+      )}
+
+      <View style={styles.grid} accessibilityRole="menu">
+        {menuItems.map((item) => (
           <TouchableOpacity 
-            testID="manager-pending-banner"
-            style={styles.summaryBanner}
-            onPress={() => navigation.navigate('AuditReport')}
+            key={item.id} 
+            testID={`menu-item-${item.screen}`}
+            style={styles.card} 
+            onPress={() => navigation.navigate(item.screen)}
+            accessibilityRole="menuitem"
+            accessibilityLabel={item.title}
           >
-            <Ionicons name="notifications" size={20} color={COLORS.white} />
-            <Text style={styles.summaryText}>
-              ACTION REQUIRED: {pendingCount} PENDING TASKS
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={COLORS.white} style={{marginLeft: 'auto'}} />
+            <View style={styles.iconBox}>
+              <Ionicons name={item.icon as any} size={28} color={COLORS.primary} />
+            </View>
+            <Text style={styles.cardText}>{item.title}</Text>
+            <Ionicons name="chevron-forward" size={24} color={COLORS.gray} />
           </TouchableOpacity>
-        )}
+        ))}
+      </View>
 
-        <View style={styles.grid}>
-          {filteredItems.map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
-              testID={`menu-item-${item.screen}`}
-              style={styles.card} 
-              onPress={() => navigation.navigate(item.screen)}
-            >
-              <View style={styles.iconBox}>
-                <Ionicons name={item.icon as any} size={24} color={COLORS.primary} />
-              </View>
-              <Text style={styles.cardText}>{item.title}</Text>
-              <Ionicons name="chevron-forward" size={18} color="#C4CDD5" />
-            </TouchableOpacity>
-          ))}
+      <View style={styles.feedSection}>
+        <View style={styles.feedHeader}>
+          <Text style={styles.feedTitle} accessibilityRole="header">LIVE INCIDENT FEED</Text>
+          <View style={styles.pulseDot}/>
         </View>
 
-        {isManager && (
-          <View style={styles.feedSection}>
-            <View style={styles.feedHeader}>
-              <Text style={styles.feedTitle}>LIVE INCIDENT FEED</Text>
-              <View style={styles.pulseDot} />
+        {loading ? (
+          <ActivityIndicator color={COLORS.primary} size="large" style={{ marginTop: 20 }} accessibilityLabel="Loading feed" />
+        ) : feed.map((item, index) => (
+          <TouchableOpacity 
+            key={item.id} 
+            testID={`incident-feed-item-${index}`}
+            style={styles.feedItem}
+            onPress={() => navigation.navigate('IncidentDetail', { incident: item })}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.status} incident: ${item.description} at ${item.location}`}
+          >
+            <View style={[styles.statusLine, { backgroundColor: item.status === 'Resolved' ? COLORS.success : COLORS.warning }]} />
+            <View style={styles.feedContent}>
+              <View style={styles.feedTopRow}>
+                <Text style={styles.feedDesc} numberOfLines={1}>{item.description}</Text>
+                <Text style={[styles.statusTag, { color: item.status === 'Resolved' ? COLORS.success : COLORS.warning }]}>
+                  {item.status.toUpperCase()}
+                </Text>
+              </View>
+              <Text style={styles.feedMeta}>
+                {item.location} • {new Date(item.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+              </Text>
             </View>
-
-            {loading ? (
-              <ActivityIndicator color={COLORS.primary} style={{ marginTop: 20 }} />
-            ) : feed.map((item, index) => (
-              <TouchableOpacity 
-                key={item.id} 
-                testID={`incident-feed-item-${index}`}
-                style={styles.feedItem}
-                onPress={() => navigation.navigate('IncidentDetail', { incident: item })}
-              >
-                <View style={[styles.statusLine, { backgroundColor: item.status === 'Resolved' ? '#00C853' : '#FFAB00' }]} />
-                <View style={styles.feedContent}>
-                  <View style={styles.feedTopRow}>
-                    <Text style={styles.feedDesc} numberOfLines={1}>{item.description}</Text>
-                    <Text style={[styles.statusTag, { color: item.status === 'Resolved' ? '#00C853' : '#FFAB00' }]}>
-                      {item.status.toUpperCase()}
-                    </Text>
-                  </View>
-                  <Text style={styles.feedMeta}>
-                    {item.location} • {new Date(item.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                  </Text>
-                </View>
-                <Ionicons name="eye-outline" size={18} color="#C4CDD5" style={{marginLeft: 10}} />
-              </TouchableOpacity>
-            ))}
-            {!loading && feed.length === 0 && (
-              <Text style={styles.emptyText}>No recent site activity.</Text>
-            )}
-          </View>
+            <Ionicons name="eye-outline" size={24} color={COLORS.gray} style={{marginLeft: 10}} />
+          </TouchableOpacity>
+        ))}
+        {!loading && feed.length === 0 && (
+          <Text style={styles.emptyText}>No recent site activity.</Text>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F7FA' },
-  content: { padding: 15 },
-  hero: { marginBottom: 20, paddingLeft: 5 },
-  greeting: { fontSize: 11, fontWeight: '800', color: COLORS.secondary, letterSpacing: 1.5 },
-  name: { fontSize: 26, color: COLORS.primary, marginTop: 4, fontWeight: 'bold' },
+  content: { padding: SPACING.m },
+  hero: { marginBottom: SPACING.l, paddingLeft: 5 },
+  greeting: { ...TYPOGRAPHY.caption, fontWeight: '800', color: COLORS.secondary, letterSpacing: 1.5 },
+  name: { ...TYPOGRAPHY.header, fontSize: 28, color: COLORS.primary, marginTop: 4 },
   summaryBanner: {
     backgroundColor: COLORS.secondary,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    minHeight: TOUCH_TARGETS.min,
+    padding: SPACING.s,
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: SPACING.l,
     gap: 10,
-    elevation: 3
+    ...SHADOWS.light
   },
-  summaryText: { color: COLORS.white, fontWeight: '800', fontSize: 12, letterSpacing: 0.5 },
-  grid: { gap: 10, marginBottom: 30 },
+  summaryText: { color: COLORS.white, fontWeight: '900', fontSize: 14, letterSpacing: 0.5 },
+  grid: { gap: 12, marginBottom: SPACING.xl },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
-    padding: 18,
+    minHeight: TOUCH_TARGETS.min * 1.5,
+    padding: SPACING.m,
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E1E6ED'
+    ...SHADOWS.light,
+    borderWidth: 1.5,
+    borderColor: COLORS.lightGray
   },
-  iconBox: { width: 44, height: 44, backgroundColor: '#F0F4F8', borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  cardText: { flex: 1, fontSize: 14, fontWeight: '700', color: COLORS.primary },
+  iconBox: { 
+    width: 48, 
+    height: 48, 
+    backgroundColor: COLORS.background, 
+    borderRadius: 12, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginRight: SPACING.m 
+  },
+  cardText: { flex: 1, ...TYPOGRAPHY.body, fontWeight: '800', color: COLORS.primary },
   feedSection: { marginTop: 10 },
-  feedHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 15, gap: 8, paddingLeft: 5 },
-  feedTitle: { fontSize: 12, fontWeight: '900', color: COLORS.primary, letterSpacing: 1 },
-  pulseDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF4D4F' },
+  feedHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.m, gap: 8, paddingLeft: 5 },
+  feedTitle: { ...TYPOGRAPHY.caption, fontWeight: '900', color: COLORS.primary, letterSpacing: 1 },
+  pulseDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.secondary },
   feedItem: {
     backgroundColor: COLORS.white,
-    padding: 15,
+    padding: SPACING.m,
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-    elevation: 1,
-    borderWidth: 1,
-    borderColor: '#E1E6ED'
+    minHeight: TOUCH_TARGETS.min * 1.6,
+    marginBottom: 10,
+    ...SHADOWS.light,
+    borderWidth: 1.5,
+    borderColor: COLORS.lightGray
   },
-  statusLine: { width: 4, height: 40, borderRadius: 2, marginRight: 12 },
+  statusLine: { width: 6, height: 45, borderRadius: 3, marginRight: 12 },
   feedContent: { flex: 1 },
   feedTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  feedDesc: { fontSize: 13, fontWeight: '700', color: COLORS.primary, flex: 0.75 },
-  feedMeta: { fontSize: 11, color: COLORS.textLight, marginTop: 2 },
-  statusTag: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
-  emptyText: { textAlign: 'center', color: '#A0AEC0', marginTop: 20, fontSize: 12 }
-});s
+  feedDesc: { ...TYPOGRAPHY.body, fontWeight: '800', color: COLORS.primary, flex: 0.75 },
+  feedMeta: { ...TYPOGRAPHY.body, fontSize: 13, color: COLORS.textLight, marginTop: 4 },
+  statusTag: { ...TYPOGRAPHY.caption, fontWeight: '900', letterSpacing: 0.5 },
+  emptyText: { textAlign: 'center', ...TYPOGRAPHY.body, color: COLORS.textLight, marginTop: 20 }
+});

@@ -25,13 +25,13 @@ describe('SyncService', () => {
     const mockQueue = [{
       id: '1',
       table: 'storage_uploads',
-      data: { bucket: 'b', path: 'p', base64Str: 'str' }
+      data: { bucket: 'evidence', userId: 'u123', fileUri: 'uri', fileName: 'file.pdf' }
     }];
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(mockQueue));
 
     await syncService.syncNow();
 
-    expect(fileService.uploadFile).toHaveBeenCalled();
+    expect(fileService.uploadCompetenceDocument).toHaveBeenCalledWith('u123', 'uri', 'file.pdf', true);
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(expect.any(String), "[]");
   });
 
@@ -42,11 +42,32 @@ describe('SyncService', () => {
       data: { id: 1, strict_mode: true }
     }];
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(mockQueue));
-    const mockUpdate = { update: jest.fn().mockReturnThis(), eq: jest.fn().mockResolvedValue({ error: null }) };
-    (supabase.from as jest.Mock).mockReturnValue(mockUpdate);
+    
+    const mockEq = jest.fn().mockResolvedValue({ error: null });
+    const mockUpdate = jest.fn().mockReturnValue({ eq: mockEq });
+    (supabase.from as jest.Mock).mockReturnValue({ update: mockUpdate });
 
     await syncService.syncNow();
 
-    expect(mockUpdate.eq).toHaveBeenCalledWith('id', 1);
+    expect(supabase.from).toHaveBeenCalledWith('site_settings');
+    expect(mockEq).toHaveBeenCalledWith('id', 1);
+  });
+
+  it('should process deletions correctly', async () => {
+    const mockQueue = [{
+      id: '3',
+      table: 'assets_deletions',
+      data: { id: 'a123' }
+    }];
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(mockQueue));
+
+    const mockEq = jest.fn().mockResolvedValue({ error: null });
+    const mockDelete = jest.fn().mockReturnValue({ eq: mockEq });
+    (supabase.from as jest.Mock).mockReturnValue({ delete: mockDelete });
+
+    await syncService.syncNow();
+
+    expect(supabase.from).toHaveBeenCalledWith('assets');
+    expect(mockEq).toHaveBeenCalledWith('id', 'a123');
   });
 });

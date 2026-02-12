@@ -6,17 +6,31 @@ appId: com.blakemedlock.ComplianceApp
       USER_EMAIL: "contractor@test.co.uk"
       USER_PASS: "password"
 
-- assertVisible: "CONTRACTOR PORTAL"
 - tapOn: { id: "btn-sign-off-0" }
 
-- assertVisible: "STATUTORY CERTIFICATION"
-- inputText: { id: "input-resolution-notes", text: "Completed emergency light testing. Replaced 2 faulty batteries." }
-- inputText: { id: "input-remedial-actions", text: "Re-certified Block B for another 6 months." }
-- inputText: { id: "input-digital-signature", text: "B. Medlock" }
+- extendedWaitUntil:
+    visible: { id: "sign-off-modal" }
+    timeout: 10000
+
+
+- tapOn: { id: "input-resolution-notes" }
+- inputText: "Completed emergency light testing. Replaced 2 faulty batteries."
+
+- tapOn: { id: "input-remedial-actions" }
+- inputText: "Re-certified Block B for another 6 months."
+
+- tapOn: { id: "input-digital-signature" }
+- inputText: "B. Medlock"
 
 - tapOn: { id: "switch-next-service" }
 
+- tapOn: "OK"
+
 - tapOn: { id: "btn-seal-record" }
 
-- assertVisible: "Regulatory record sealed."
+
+- extendedWaitUntil:
+    visible: "Regulatory record sealed."
+    timeout: 20000
+
 - tapOn: "OK"

@@ -31,7 +31,6 @@ describe('FileService', () => {
 
     const result = await fileService.uploadIncidentEvidence('user123', 'file://test-image.jpg');
     
-    // Result should be a string (the path) when online
     expect(typeof result).toBe('string');
     expect(result).toMatch(/^fault_\d+\.jpg$/);
     expect(supabase.storage.from).toHaveBeenCalledWith('incident-evidence');
@@ -52,7 +51,6 @@ describe('FileService', () => {
     
     const result = await fileService.uploadIncidentEvidence('user123', 'file://test.jpg');
     
-    // Check that we received the offline object
     expect(result).toHaveProperty('offline', true);
     expect(result).toHaveProperty('path', expect.stringMatching(/^fault_\d+\.jpg$/));
     
@@ -61,16 +59,22 @@ describe('FileService', () => {
     }));
   });
 
-  it('should handle PDF content type correctly', async () => {
-    (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
-    mockUpload.mockResolvedValue({ data: { path: 'fault_123.pdf' }, error: null });
+  it('should throw error for invalid file types in incident evidence', async () => {
+    await expect(fileService.uploadIncidentEvidence('user123', 'file://test.pdf'))
+      .rejects
+      .toThrow('Invalid file type. Only images (JPG, PNG) are allowed.');
+  });
 
-    await fileService.uploadIncidentEvidence('user123', 'file://test.pdf');
+  it('should handle image content types correctly during general upload', async () => {
+    (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+    mockUpload.mockResolvedValue({ data: { path: 'test.jpg' }, error: null });
+
+    await fileService.uploadFile('incident-evidence', 'test.jpg', 'file://test.jpg');
 
     expect(mockUpload).toHaveBeenCalledWith(
-      expect.stringContaining('.pdf'),
+      'test.jpg',
       expect.any(Object),
-      expect.objectContaining({ contentType: 'application/pdf' })
+      expect.objectContaining({ contentType: 'image/jpeg' })
     );
   });
 });

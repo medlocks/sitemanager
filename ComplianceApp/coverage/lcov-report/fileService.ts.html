@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">51.42% </span>
+                <span class="strong">53.65% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>18/35</span>
+                <span class='fraction'>22/41</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">43.75% </span>
+                <span class="strong">44.44% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>7/16</span>
+                <span class='fraction'>8/18</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">53.12% </span>
+                <span class="strong">57.89% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>17/32</span>
+                <span class='fraction'>22/38</span>
             </div>
         
             
@@ -151,7 +151,18 @@
 <a name='L86'></a><a href='#L86'>86</a>
 <a name='L87'></a><a href='#L87'>87</a>
 <a name='L88'></a><a href='#L88'>88</a>
-<a name='L89'></a><a href='#L89'>89</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -161,16 +172,18 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -201,11 +214,18 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -244,27 +264,30 @@ import { decode } from 'base64-arraybuffer';
 import NetInfo from '@react-native-community/netinfo';
 import * as FileSystem from 'expo-file-system/legacy';
 import { syncService } from './syncService';
+import { InputValidator } from '../utils/InputValidator';
 &nbsp;
 export const fileService = {
   getMimeType(fileName: string) {
     const ext = fileName.split('.').pop()?.toLowerCase();
-    if (ext === 'pdf') return 'application/pdf';
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (ext === 'pdf') <span class="cstat-no" title="statement not covered" >return 'application/pdf';</span>
     return 'image/jpeg';
   },
 &nbsp;
   async uploadFile(bucket: string, path: string, fileUri: string) {
+    const cleanBucket = InputValidator.sanitize(bucket);
+    const cleanPath = InputValidator.sanitize(path);
+    
     const state = await NetInfo.fetch();
-    const contentType = this.getMimeType(path);
+    const contentType = this.getMimeType(cleanPath);
 &nbsp;
     if (!state.isConnected) {
       await syncService.enqueue('storage_uploads', {
-        bucket,
-        path,
+        bucket: cleanBucket,
+        path: cleanPath,
         fileUri,
         contentType
       });
-      // Return object for consistent offline state detection
-      return { offline: true, path }; 
+      return { offline: true, path: cleanPath }; 
     }
 &nbsp;
     try {
@@ -273,14 +296,14 @@ export const fileService = {
       });
 &nbsp;
       const { error } = await supabase.storage
-        .from(bucket)
-        .upload(path, decode(base64Data), {
+        .from(cleanBucket)
+        .upload(cleanPath, decode(base64Data), {
           contentType: contentType,
           upsert: true
         });
 &nbsp;
       <span class="missing-if-branch" title="if path not taken" >I</span>if (error) <span class="cstat-no" title="statement not covered" >throw error;</span>
-      return path;
+      return cleanPath;
     } catch (error) {
 <span class="cstat-no" title="statement not covered" >      console.error("Upload Error:", error);</span>
 <span class="cstat-no" title="statement not covered" >      throw error;</span>
@@ -289,18 +312,25 @@ export const fileService = {
 &nbsp;
   async uploadIncidentEvidence(userId: string, fileUri: string, isSyncing = false) {
     const fileExt = fileUri.split('.').pop()?.split('?')[0].toLowerCase() || <span class="branch-1 cbranch-no" title="branch not covered" >'jpg';</span>
+    
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+    if (!allowedExtensions.includes(fileExt)) {
+      throw new Error('Invalid file type. Only images (JPG, PNG) are allowed.');
+    }
+&nbsp;
     const fileName = `fault_${Date.now()}.${fileExt}`;
     return await this.uploadFile('incident-evidence', fileName, fileUri);
   },
 &nbsp;
 <span class="fstat-no" title="function not covered" >  as</span>ync uploadCompetenceDocument(userId: string, fileUri: string, originalName: string, isSyncing = <span class="branch-0 cbranch-no" title="branch not covered" >false)</span> {
+    const cleanUserId = <span class="cstat-no" title="statement not covered" >InputValidator.sanitize(userId);</span>
     const state = <span class="cstat-no" title="statement not covered" >await NetInfo.fetch();</span>
     const bucket = <span class="cstat-no" title="statement not covered" >'evidence'; </span>
-    const path = <span class="cstat-no" title="statement not covered" >`${userId}-${Date.now()}.pdf`;</span>
+    const path = <span class="cstat-no" title="statement not covered" >`${cleanUserId}-${Date.now()}.pdf`;</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    if (!state.isConnected &amp;&amp; !isSyncing) {</span>
 <span class="cstat-no" title="statement not covered" >      await syncService.enqueue('storage_uploads', {</span>
-        userId,
+        userId: cleanUserId,
         fileUri,
         fileName: path,
         bucket
@@ -334,7 +364,7 @@ export const fileService = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-02-01T21:18:11.537Z
+                at 2026-02-12T01:39:23.917Z
             </div>
         <script src="prettify.js"></script>
         <script>

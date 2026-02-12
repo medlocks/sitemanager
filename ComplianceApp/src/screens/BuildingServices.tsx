@@ -5,7 +5,7 @@ import {
 import { buildingService } from '../services/buildingService';
 import { assetService } from '../services/assetService';
 import { useAuth } from '../context/AuthContext';
-import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '../theme';
+import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, TOUCH_TARGETS } from '../theme';
 
 export const BuildingServices = ({ navigation }: any) => {
   const { user } = useAuth();
@@ -32,6 +32,8 @@ export const BuildingServices = ({ navigation }: any) => {
             testID="btn-nav-add-asset"
             onPress={() => navigation.navigate('AddAsset')} 
             style={styles.navAddBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Add new asset"
           >
             <Text style={styles.navAddText}>+ NEW</Text>
           </TouchableOpacity>
@@ -63,6 +65,8 @@ export const BuildingServices = ({ navigation }: any) => {
         testID={`asset-card-${index}`}
         style={[styles.card, { borderLeftColor: isCompliant ? COLORS.success : COLORS.secondary }]}
         onPress={() => isManager && navigation.navigate('AddAsset', { asset: item })}
+        accessibilityRole={isManager ? "button" : "none"}
+        accessibilityLabel={`${item.assetName}, Status: ${item.status}. ${isManager ? 'Double tap to edit asset.' : ''}`}
       >
         <View style={styles.headerRow}>
           <Text style={styles.typeTag}>{item.type}</Text>
@@ -71,11 +75,19 @@ export const BuildingServices = ({ navigation }: any) => {
           </View>
         </View>
         <Text style={styles.assetTitle}>{item.assetName}</Text>
-        <Text style={styles.meta}>📍 {item.location || 'No location'}</Text>
+        <Text style={styles.meta} accessibilityLabel={`Location: ${item.location || 'No location specified'}`}>
+           {item.location || 'No location'}
+        </Text>
         
         <View style={styles.dateGrid}>
-          <View><Text style={styles.dateLabel}>LAST</Text><Text style={styles.dateValue}>{item.lastServiceDate || '-'}</Text></View>
-          <View><Text style={styles.dateLabel}>DUE</Text><Text style={styles.dateValue}>{item.nextServiceDueDate}</Text></View>
+          <View>
+            <Text style={styles.dateLabel}>LAST SERVICE</Text>
+            <Text style={styles.dateValue}>{item.lastServiceDate || '-'}</Text>
+          </View>
+          <View>
+            <Text style={styles.dateLabel}>DUE DATE</Text>
+            <Text style={styles.dateValue}>{item.nextServiceDueDate}</Text>
+          </View>
         </View>
 
         {isManager && (
@@ -84,6 +96,8 @@ export const BuildingServices = ({ navigation }: any) => {
               testID={`btn-assign-asset-${index}`}
               style={styles.assignBtn}
               onPress={() => navigation.navigate('ContractorAssignment', { incidentId: item.id, isAsset: true, assetName: item.assetName })}
+              accessibilityRole="button"
+              accessibilityLabel={`Assign contractor to ${item.assetName}`}
             >
               <Text style={styles.btnText}>ASSIGN</Text>
             </TouchableOpacity>
@@ -91,6 +105,8 @@ export const BuildingServices = ({ navigation }: any) => {
               testID={`btn-copy-asset-${index}`}
               style={styles.copyBtn} 
               onPress={() => handleDuplicate(item)}
+              accessibilityRole="button"
+              accessibilityLabel={`Duplicate ${item.assetName}`}
             >
               <Text style={styles.copyText}>COPY</Text>
             </TouchableOpacity>
@@ -102,13 +118,18 @@ export const BuildingServices = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.mainTitle}>Asset Register</Text>
-      {loading ? <ActivityIndicator size="large" color={COLORS.primary} testID="loading-indicator" /> : (
+      <Text style={styles.mainTitle} accessibilityRole="header">Asset Register</Text>
+      {loading ? (
+        <View style={styles.loadingWrapper}>
+            <ActivityIndicator size="large" color={COLORS.primary} testID="loading-indicator" />
+        </View>
+      ) : (
         <FlatList 
           testID="asset-list"
           data={services} 
           keyExtractor={(item) => item.id} 
-          renderItem={({item, index}) => renderService({item, index})} 
+          renderItem={({item, index}) => renderService({item, index})}
+          contentContainerStyle={styles.listContent}
         />
       )}
     </View>
@@ -116,23 +137,61 @@ export const BuildingServices = ({ navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: SPACING.m, backgroundColor: COLORS.background },
-  mainTitle: { ...TYPOGRAPHY.header, marginBottom: 15 },
-  card: { backgroundColor: COLORS.white, padding: 15, borderRadius: 10, marginBottom: 12, borderLeftWidth: 6, ...SHADOWS.light },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  typeTag: { fontSize: 10, fontWeight: 'bold', color: COLORS.primary },
-  statusBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  badgeText: { color: COLORS.white, fontSize: 10, fontWeight: 'bold' },
-  assetTitle: { fontSize: 16, fontWeight: 'bold', marginTop: 5 },
-  meta: { fontSize: 12, color: COLORS.gray },
-  dateGrid: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#eee' },
-  dateLabel: { fontSize: 8, color: COLORS.gray },
-  dateValue: { fontSize: 12, fontWeight: 'bold' },
-  actionRow: { flexDirection: 'row', marginTop: 15, justifyContent: 'space-between' },
-  assignBtn: { backgroundColor: COLORS.primary, flex: 0.75, padding: 10, borderRadius: 6, alignItems: 'center' },
-  copyBtn: { backgroundColor: '#eee', flex: 0.2, padding: 10, borderRadius: 6, alignItems: 'center' },
-  btnText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
-  copyText: { fontWeight: 'bold', fontSize: 12 },
-  navAddBtn: { backgroundColor: COLORS.success, padding: 8, borderRadius: 6 },
-  navAddText: { color: '#fff', fontWeight: 'bold' }
+  container: { flex: 1, paddingHorizontal: SPACING.m, backgroundColor: COLORS.background },
+  mainTitle: { ...TYPOGRAPHY.header, marginVertical: SPACING.m },
+  listContent: { paddingBottom: SPACING.xl },
+  loadingWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  card: { 
+    backgroundColor: COLORS.white, 
+    padding: SPACING.m, 
+    borderRadius: 12, 
+    marginBottom: SPACING.m, 
+    borderLeftWidth: 8, 
+    ...SHADOWS.light,
+    minHeight: 120 
+  },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  typeTag: { ...TYPOGRAPHY.caption, fontWeight: '800', color: COLORS.primary, letterSpacing: 0.5 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  badgeText: { color: COLORS.white, fontSize: 12, fontWeight: '900' },
+  assetTitle: { ...TYPOGRAPHY.subheader, marginTop: 8 },
+  meta: { ...TYPOGRAPHY.body, color: COLORS.textLight, marginTop: 4 },
+  dateGrid: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    marginTop: SPACING.m, 
+    paddingTop: SPACING.s, 
+    borderTopWidth: 1.5, 
+    borderTopColor: COLORS.lightGray 
+  },
+  dateLabel: { ...TYPOGRAPHY.caption, color: COLORS.textLight, fontWeight: '700' },
+  dateValue: { ...TYPOGRAPHY.body, fontWeight: '800', marginTop: 2 },
+  actionRow: { flexDirection: 'row', marginTop: SPACING.l, justifyContent: 'space-between', gap: SPACING.s },
+  assignBtn: { 
+    backgroundColor: COLORS.primary, 
+    flex: 0.75, 
+    minHeight: TOUCH_TARGETS.min, 
+    borderRadius: 10, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  copyBtn: { 
+    backgroundColor: COLORS.lightGray, 
+    flex: 0.25, 
+    minHeight: TOUCH_TARGETS.min, 
+    borderRadius: 10, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  btnText: { color: COLORS.white, fontWeight: '900', fontSize: 14, letterSpacing: 1 },
+  copyText: { color: COLORS.text, fontWeight: '800', fontSize: 14 },
+  navAddBtn: { 
+    backgroundColor: COLORS.success, 
+    paddingHorizontal: 12, 
+    minHeight: 36, 
+    borderRadius: 8, 
+    justifyContent: 'center',
+    marginRight: 10
+  },
+  navAddText: { color: COLORS.white, fontWeight: '900', fontSize: 12 }
 });

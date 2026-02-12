@@ -2,7 +2,13 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { authService } from '../services/authService';
-import { User } from '../types';
+
+interface User {
+  id: string;
+  email: string;
+  role: 'Manager' | 'Employee' | 'Contractor';
+  name: string;
+}
 
 interface AuthContextType {
   user: User | null;

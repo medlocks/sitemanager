@@ -1,55 +1,70 @@
-import { TextStyle, ViewStyle, ImageStyle } from 'react-native';
+import { TextStyle, ViewStyle } from 'react-native';
 
 export const COLORS = {
-  primary: '#002d72',
-  secondary: '#dc3545',
-  accent: '#17a2b8',
-  warning: '#ffc107',
-  success: '#28a745',
-  info: '#007bff',
-  background: '#f4f7f6',
-  white: '#ffffff',
-  gray: '#6c757d',
-  lightGray: '#eee',
-  text: '#333',
-  textLight: '#999',
+  primary: '#00265F', 
+  secondary: '#B91C1C', 
+  accent: '#0E7490',
+  warning: '#92400E', 
+  success: '#166534',
+  info: '#075985',
+  background: '#F4F7F6',
+  white: '#FFFFFF',
+  gray: '#4B5563', 
+  lightGray: '#E5E7EB',
+  text: '#1F2937',
+  textLight: '#4B5563', 
 };
 
 export const SPACING = {
-  xs: 5,
-  s: 10,
-  m: 15,
-  l: 20,
-  xl: 30,
+  xs: 8,
+  s: 12,
+  m: 16,
+  l: 24,
+  xl: 32,
 };
 
 export const TYPOGRAPHY = {
   header: {
-    fontSize: 22,
-    fontWeight: 'bold' as const, // Fixes the string assignment error
+    fontSize: 24,
+    fontWeight: '800' as const,
     color: COLORS.primary,
+    lineHeight: 32,
   } as TextStyle,
   subheader: {
-    fontSize: 16,
-    fontWeight: 'bold' as const,
+    fontSize: 18,
+    fontWeight: '700' as const,
     color: COLORS.text,
+    lineHeight: 26,
   } as TextStyle,
   body: {
-    fontSize: 14,
+    fontSize: 16,
     color: COLORS.text,
+    lineHeight: 24,
   } as TextStyle,
   caption: {
-    fontSize: 10,
+    fontSize: 14,
     color: COLORS.textLight,
+    lineHeight: 20,
   } as TextStyle,
 };
 
 export const SHADOWS = {
   light: {
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
   } as ViewStyle,
+};
+
+export const TOUCH_TARGETS = {
+  min: 48,
+  gap: 12,
+};
+
+export const ACCESSIBILITY = {
+  contrastRatio: '7:1',
+  minimumFontScale: 1.0,
+  maximumFontScale: 2.0,
 };

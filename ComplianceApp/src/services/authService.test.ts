@@ -7,6 +7,9 @@ describe('AuthService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (supabase.from as jest.Mock).mockReturnThis();
+    (supabase.auth.getUser as jest.Mock) = jest.fn().mockResolvedValue({
+      data: { user: { id: 'u123', email: 'test@raytheon.com' } }
+    });
   });
 
   it('should call signInWithPassword and then fetch the user profile', async () => {
@@ -34,11 +37,18 @@ describe('AuthService', () => {
     
     expect(result.role).toBe('Manager');
     expect(result.name).toBe('Blake');
+    expect(result.email).toBe('test@raytheon.com');
+  });
+
+  it('should throw error if password is too short', async () => {
+    await expect(authService.signIn('test@raytheon.com', '123'))
+      .rejects
+      .toThrow('Password must be at least 6 characters.');
   });
 
   it('should throw error if auth succeeds but profile is missing', async () => {
     (supabase.auth.signInWithPassword as jest.Mock).mockResolvedValue({
-      data: { user: { id: 'u999' } },
+      data: { user: { id: 'u999', email: 'bad@user.com' } },
       error: null,
     });
 
@@ -49,7 +59,7 @@ describe('AuthService', () => {
     };
     (supabase.from as jest.Mock).mockReturnValue(mockChain);
 
-    await expect(authService.signIn('bad@user.com', 'pass'))
+    await expect(authService.signIn('bad@user.com', 'password123'))
       .rejects
       .toThrow('Access Denied: No profile associated with this account.');
   });

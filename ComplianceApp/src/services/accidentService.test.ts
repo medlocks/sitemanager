@@ -11,9 +11,21 @@ jest.mock('./syncService', () => ({
 }));
 
 describe('AccidentService', () => {
+  const validMockData = { 
+    injury_description: "Detailed report of a warehouse fall", 
+    location: "Main Warehouse",
+    user_id: "u123",
+    injured_person_name: "John Doe",
+    date_time: "2026-02-11T22:00:00Z"
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     (supabase.from as jest.Mock).mockReturnThis();
+    const mockFrom = supabase.from('') as any;
+    mockFrom.select = jest.fn().mockReturnThis();
+    mockFrom.order = jest.fn().mockResolvedValue({ data: [], error: null });
+    mockFrom.insert = jest.fn().mockResolvedValue({ error: null });
   });
 
   it('should fetch accidents with reporter names', async () => {
@@ -24,31 +36,49 @@ describe('AccidentService', () => {
     expect((supabase.from('') as any).order).toHaveBeenCalledWith('date_time', { ascending: false });
   });
 
-  it('should insert accident record when online', async () => {
+  it('should insert accident record with correct schema mapping when online', async () => {
     (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
-    const mockData = { type: 'Fall', location: 'Warehouse' };
 
-    const result = await accidentService.logAccident(mockData);
+    const result = await accidentService.logAccident(validMockData);
 
     expect(supabase.from).toHaveBeenCalledWith('accidents');
-    expect((supabase.from('') as any).insert).toHaveBeenCalledWith([mockData]);
-    expect(result).toBe(true);
+    expect((supabase.from('') as any).insert).toHaveBeenCalledWith([expect.objectContaining({
+      injury_description: validMockData.injury_description,
+      injured_person_name: validMockData.injured_person_name,
+      location: validMockData.location
+    })]);
+    expect(result).toEqual({ success: true, offline: false });
   });
 
   it('should queue accident data in syncService when offline', async () => {
     (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: false });
-    const mockData = { type: 'Cut', severity: 'Low' };
 
-    const result = await accidentService.logAccident(mockData);
+    const result = await accidentService.logAccident(validMockData);
 
-    expect(syncService.enqueue).toHaveBeenCalledWith('accidents', mockData);
-    expect(result).toEqual({ offline: true });
+    expect(syncService.enqueue).toHaveBeenCalledWith('accidents', expect.objectContaining({
+      injury_description: validMockData.injury_description
+    }));
+    expect(result).toEqual({ success: true, offline: true, message: 'Saved to offline queue' });
   });
 
-  it('should throw error if supabase insert fails', async () => {
-    (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
-    (supabase.from('') as any).insert.mockResolvedValueOnce({ error: new Error('DB Error') });
+  it('should return error object if validation fails', async () => {
+    const invalidData = { 
+      injury_description: "Short", 
+      location: "L", 
+      user_id: "u123", 
+      injured_person_name: "J" 
+    };
+    const result = await accidentService.logAccident(invalidData as any);
+    
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+  });
 
-    await expect(accidentService.logAccident({})).rejects.toThrow('DB Error');
+  it('should return real database error message if supabase insert fails', async () => {
+    (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+    (supabase.from('') as any).insert.mockResolvedValueOnce({ error: { message: 'Column not found' } });
+
+    const result = await accidentService.logAccident(validMockData);
+    expect(result).toEqual({ success: false, error: 'Column not found' });
   });
 });

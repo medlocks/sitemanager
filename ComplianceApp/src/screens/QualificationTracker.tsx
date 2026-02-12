@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, SafeAreaView, SectionList, Alert } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  TextInput, 
+  ActivityIndicator, 
+  SafeAreaView, 
+  SectionList, 
+  Alert 
+} from 'react-native';
 import { contractorService, Contractor } from '../services/contractorService';
-import { COLORS, TYPOGRAPHY, SHADOWS } from '../theme';
+import { COLORS, TYPOGRAPHY, SHADOWS, SPACING, TOUCH_TARGETS } from '../theme';
 
 export const QualificationTracker = ({ navigation }: any) => {
   const [allContractors, setAllContractors] = useState<Contractor[]>([]);
@@ -59,29 +69,38 @@ export const QualificationTracker = ({ navigation }: any) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.mainTitle}>Workforce Governance</Text>
+        <Text style={styles.mainTitle} accessibilityRole="header">Workforce Governance</Text>
         <TextInput 
           style={styles.searchBar} 
           placeholder="Search by name, trade, or company..." 
-          placeholderTextColor="#999"
+          placeholderTextColor={COLORS.textLight}
           value={searchQuery}
           onChangeText={setSearchQuery}
           editable={!loading}
+          accessibilityLabel="Search workforce"
+          accessibilityHint="Filters contractors by name, trade, or company"
         />
       </View>
       
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} accessibilityLabel="Loading workforce data" />
+        </View>
       ) : (
         <SectionList
           sections={filteredSections}
           keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          stickySectionHeadersEnabled={false}
           renderItem={({ item }) => (
             <TouchableOpacity 
               style={styles.card} 
               onPress={() => navigation.navigate('ContractorDetail', { contractor: item })}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.name}, ${item.specialism || 'General'} Specialist. Status: ${item.competence_status}`}
+              accessibilityHint="Opens detailed competence dossier"
             >
-              <View>
+              <View style={styles.infoBox}>
                 <Text style={styles.name}>{item.name}</Text>
                 <Text style={styles.sub}>{item.specialism || 'General'} Specialist</Text>
               </View>
@@ -89,11 +108,12 @@ export const QualificationTracker = ({ navigation }: any) => {
             </TouchableOpacity>
           )}
           renderSectionHeader={({ section: { title } }) => (
-            <Text style={styles.sectionHeader}>{title}</Text>
+            <Text style={styles.sectionHeader} accessibilityRole="header">{title}</Text>
           )}
-          contentContainerStyle={styles.listContent}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No contractors match your search.</Text>
+            <Text style={styles.emptyText} accessibilityRole="text">
+              No contractors match your search or require verification.
+            </Text>
           }
         />
       )}
@@ -103,15 +123,81 @@ export const QualificationTracker = ({ navigation }: any) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  header: { padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
-  mainTitle: { ...TYPOGRAPHY.header, color: COLORS.primary },
-  searchBar: { backgroundColor: '#f5f5f5', padding: 12, borderRadius: 10, marginTop: 10, color: '#000' },
-  sectionHeader: { fontSize: 12, fontWeight: 'bold', color: COLORS.gray, marginTop: 25, marginBottom: 10, textTransform: 'uppercase' },
-  card: { backgroundColor: '#fff', padding: 15, borderRadius: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, ...SHADOWS.light },
-  name: { fontWeight: 'bold', fontSize: 16 },
-  sub: { fontSize: 12, color: COLORS.gray, marginTop: 2 },
-  chevron: { color: COLORS.primary, fontWeight: 'bold' },
-  loader: { marginTop: 50 },
-  listContent: { paddingHorizontal: 20, paddingBottom: 40 },
-  emptyText: { textAlign: 'center', marginTop: 40, color: COLORS.gray }
+  header: { 
+    padding: SPACING.l, 
+    backgroundColor: COLORS.white, 
+    borderBottomWidth: 2, 
+    borderBottomColor: COLORS.lightGray 
+  },
+  mainTitle: { 
+    ...TYPOGRAPHY.header, 
+    color: COLORS.primary 
+  },
+  searchBar: { 
+    backgroundColor: COLORS.background, 
+    minHeight: TOUCH_TARGETS.min, 
+    paddingHorizontal: SPACING.m, 
+    borderRadius: 12, 
+    marginTop: SPACING.m, 
+    ...TYPOGRAPHY.body,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  sectionHeader: { 
+    ...TYPOGRAPHY.caption,
+    fontWeight: '900', 
+    color: COLORS.text, 
+    marginTop: SPACING.xl, 
+    marginBottom: SPACING.s, 
+    textTransform: 'uppercase',
+    letterSpacing: 1
+  },
+  listContent: { 
+    paddingHorizontal: SPACING.l, 
+    paddingBottom: SPACING.xl 
+  },
+  card: { 
+    backgroundColor: COLORS.white, 
+    minHeight: 80,
+    padding: SPACING.m, 
+    borderRadius: 12, 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: SPACING.s, 
+    ...SHADOWS.light,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray
+  },
+  infoBox: {
+    flex: 1
+  },
+  name: { 
+    ...TYPOGRAPHY.subheader,
+    color: COLORS.primary 
+  },
+  sub: { 
+    ...TYPOGRAPHY.body, 
+    fontSize: 13,
+    color: COLORS.textLight, 
+    marginTop: 2 
+  },
+  chevron: { 
+    color: COLORS.primary, 
+    fontSize: 20,
+    fontWeight: '900',
+    marginLeft: SPACING.s
+  },
+  emptyText: { 
+    textAlign: 'center', 
+    ...TYPOGRAPHY.body,
+    marginTop: 60, 
+    color: COLORS.textLight 
+  }
 });

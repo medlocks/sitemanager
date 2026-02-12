@@ -5,7 +5,7 @@ appId: com.blakemedlock.ComplianceApp
     env:
       USER_EMAIL: "employee@test.co.uk"
       USER_PASS: "password"
-- assertVisible: "COMMAND DASHBOARD"
+- assertVisible: "HOME"
 - tapOn: { id: "menu-item-FaultReporting" }
 - inputText: { id: "input-fault-location", text: "North Wing - Block C" }
 - tapOn:

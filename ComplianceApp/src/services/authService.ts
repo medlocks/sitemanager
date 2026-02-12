@@ -1,10 +1,30 @@
 import { supabase } from '../lib/supabase';
-import { User, UserRole } from '../types';
+import { InputValidator } from '../utils/InputValidator';
+
+export type UserRole = 'Manager' | 'Employee' | 'Contractor';
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  isAuthorised: boolean;
+}
 
 export const authService = {
   async signIn(email: string, password: string): Promise<User> {
+    const cleanEmail = InputValidator.sanitize(email);
+    
+    if (!InputValidator.isValidEmail(cleanEmail)) {
+      throw new Error('Please enter a valid email address.');
+    }
+
+    if (!password || password.length < 6) {
+      throw new Error('Password must be at least 6 characters.');
+    }
+
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
+      email: cleanEmail,
       password,
     });
 
@@ -17,7 +37,10 @@ export const authService = {
       throw new Error('Access Denied: No profile associated with this account.');
     }
 
-    return profile;
+    return {
+      ...profile,
+      email: authData.user.email || profile.email
+    };
   },
 
   async signOut() {
@@ -35,11 +58,15 @@ export const authService = {
     if (error) throw error;
     if (!data) return null;
 
+    const { data: { user } } = await supabase.auth.getUser();
+    const email = user?.id === uid ? user.email : '';
+
     return {
       id: uid,
+      email: email || '',
       name: data.name || 'User',
       role: data.role as UserRole,
-      isAuthorized: true
+      isAuthorised: true
     };
   }
 };
