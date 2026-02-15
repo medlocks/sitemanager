@@ -15,11 +15,11 @@ appId: com.blakemedlock.ComplianceApp
 - tapOn:
     point: "50%, 10%"
 
-- tapOn: {id: "login-submit-btn"}
+- tapOn: { id: "login-submit-btn" }
 
 - extendedWaitUntil:
     visible: "Statutory Privacy Protocol"
-    timeout: 30000 
+    timeout: 30000
 
-- tapOn: 
+- tapOn:
     point: "50%, 85%"

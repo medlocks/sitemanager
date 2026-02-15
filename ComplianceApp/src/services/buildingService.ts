@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from "../lib/supabase";
 
 export interface ServiceReport {
   id: string;
@@ -14,13 +14,13 @@ export interface ServiceReport {
 export const buildingService = {
   async getServiceReports(): Promise<ServiceReport[]> {
     const { data, error } = await supabase
-      .from('assets')
-      .select('*')
-      .order('next_service_due', { ascending: true });
+      .from("assets")
+      .select("*")
+      .order("next_service_due", { ascending: true });
 
     if (error) throw error;
 
-    return data.map(item => ({
+    return data.map((item) => ({
       id: item.id,
       assetName: item.asset_name,
       type: item.type,
@@ -28,7 +28,7 @@ export const buildingService = {
       location: item.location,
       status: item.status,
       lastServiceDate: item.last_service,
-      nextServiceDueDate: item.next_service_due
+      nextServiceDueDate: item.next_service_due,
     }));
-  }
+  },
 };

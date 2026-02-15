@@ -1,7 +1,7 @@
-import { supabase } from '../lib/supabase';
-import NetInfo from '@react-native-community/netinfo';
-import { syncService } from './syncService';
-import { InputValidator } from '../utils/InputValidator';
+import { supabase } from "../lib/supabase";
+import NetInfo from "@react-native-community/netinfo";
+import { syncService } from "./syncService";
+import { InputValidator } from "../utils/InputValidator";
 
 interface AccidentReport {
   user_id: string;
@@ -22,7 +22,10 @@ export const accidentService = {
     const cleanLocation = InputValidator.sanitize(data.location);
     const cleanName = InputValidator.sanitize(data.injured_person_name);
 
-    const validation = InputValidator.validateIncident(cleanDescription, cleanLocation);
+    const validation = InputValidator.validateIncident(
+      cleanDescription,
+      cleanLocation,
+    );
 
     if (!validation.isValid) {
       return { success: false, error: validation.errors[0] };
@@ -39,13 +42,15 @@ export const accidentService = {
     const state = await NetInfo.fetch();
 
     if (!state.isConnected) {
-      await syncService.enqueue('accidents', payload);
-      return { success: true, offline: true, message: 'Saved to offline queue' };
+      await syncService.enqueue("accidents", payload);
+      return {
+        success: true,
+        offline: true,
+        message: "Saved to offline queue",
+      };
     }
 
-    const { error } = await supabase
-      .from('accidents')
-      .insert([payload]);
+    const { error } = await supabase.from("accidents").insert([payload]);
 
     if (error) {
       console.error("[AccidentService] Error:", error);
@@ -57,17 +62,19 @@ export const accidentService = {
 
   async getAccidents() {
     const { data, error } = await supabase
-      .from('accidents')
-      .select(`
+      .from("accidents")
+      .select(
+        `
         *,
         reporter:user_id (name) 
-      `)
-      .order('date_time', { ascending: false });
-    
+      `,
+      )
+      .order("date_time", { ascending: false });
+
     if (error) {
       console.error("[AccidentService] Fetch Error:", error);
       throw error;
     }
     return data;
-  }
+  },
 };

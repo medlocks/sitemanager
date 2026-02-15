@@ -1,14 +1,32 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView, Linking, ScrollView } from 'react-native';
-import * as DocumentPicker from 'expo-document-picker';
-import { supabase } from '../lib/supabase';
-import { contractorService, Contractor } from '../services/contractorService';
-import { fileService } from '../services/fileService';
-import { useAuth } from '../context/AuthContext';
-import { COLORS, SHADOWS, TYPOGRAPHY, SPACING, TOUCH_TARGETS } from '../theme';
-import { privacyService } from '../services/privacyService';
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  SafeAreaView,
+  Linking,
+  ScrollView,
+} from "react-native";
+import * as DocumentPicker from "expo-document-picker";
+import { supabase } from "../lib/supabase";
+import { contractorService, Contractor } from "../services/contractorService";
+import { fileService } from "../services/fileService";
+import { useAuth } from "../context/AuthContext";
+import { COLORS, SHADOWS, TYPOGRAPHY, SPACING, TOUCH_TARGETS } from "../theme";
+import { privacyService } from "../services/privacyService";
 
-const SPECIALISMS = ['Electrical', 'Plumbing', 'HVAC', 'Fire Safety', 'Gas', 'General', 'Caretaker'];
+const SPECIALISMS = [
+  "Electrical",
+  "Plumbing",
+  "HVAC",
+  "Fire Safety",
+  "Gas",
+  "General",
+  "Caretaker",
+];
 
 export const ContractorProfile = () => {
   const { user } = useAuth();
@@ -46,8 +64,8 @@ export const ContractorProfile = () => {
     if (!user?.id) return;
     try {
       const res = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/*'],
-        copyToCacheDirectory: true
+        type: ["application/pdf", "image/*"],
+        copyToCacheDirectory: true,
       });
 
       if (res.canceled) return;
@@ -55,14 +73,21 @@ export const ContractorProfile = () => {
       setUploading(true);
       const file = res.assets[0];
 
-      const result = await fileService.uploadCompetenceDocument(user.id, file.uri, file.name);
+      const result = await fileService.uploadCompetenceDocument(
+        user.id,
+        file.uri,
+        file.name,
+      );
 
-      const finalPath = typeof result === 'object' ? result.path : result;
+      const finalPath = typeof result === "object" ? result.path : result;
 
       await contractorService.submitCompetence(user.id, finalPath);
 
-      if (typeof result === 'object' && result.offline) {
-        Alert.alert("Offline", "Certification saved locally. It will sync when you are back online.");
+      if (typeof result === "object" && result.offline) {
+        Alert.alert(
+          "Offline",
+          "Certification saved locally. It will sync when you are back online.",
+        );
       } else {
         Alert.alert("Success", "Certification updated. Pending verification.");
       }
@@ -80,12 +105,10 @@ export const ContractorProfile = () => {
 
     const path = profile.competence_evidence_url;
 
-    if (path.startsWith('http')) {
+    if (path.startsWith("http")) {
       Linking.openURL(path);
     } else {
-      const { data } = supabase.storage
-        .from('evidence')
-        .getPublicUrl(path);
+      const { data } = supabase.storage.from("evidence").getPublicUrl(path);
 
       if (data?.publicUrl) {
         Linking.openURL(data.publicUrl);
@@ -93,31 +116,42 @@ export const ContractorProfile = () => {
     }
   };
 
-  if (loading) return (
-    <View style={styles.centerLoader}>
-      <ActivityIndicator size="large" color={COLORS.primary} />
-    </View>
-  );
+  if (loading)
+    return (
+      <View style={styles.centerLoader}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.card}>
-          <Text style={styles.label} accessibilityRole="header">OPERATIVE NAME</Text>
+          <Text style={styles.label} accessibilityRole="header">
+            OPERATIVE NAME
+          </Text>
           <Text style={styles.val}>{profile?.name}</Text>
 
           <Text style={styles.label}>MY SPECIALISM (TRADE)</Text>
           <View style={styles.chipRow} accessibilityRole="radiogroup">
-            {SPECIALISMS.map(s => (
+            {SPECIALISMS.map((s) => (
               <TouchableOpacity
                 key={s}
-                style={[styles.chip, profile?.specialism === s && styles.chipActive]}
+                style={[
+                  styles.chip,
+                  profile?.specialism === s && styles.chipActive,
+                ]}
                 onPress={() => handleUpdateSpecialism(s)}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: profile?.specialism === s }}
                 accessibilityLabel={`${s} specialism`}
               >
-                <Text style={[styles.chipText, profile?.specialism === s && styles.chipTextActive]}>
+                <Text
+                  style={[
+                    styles.chipText,
+                    profile?.specialism === s && styles.chipTextActive,
+                  ]}
+                >
                   {s.toUpperCase()}
                 </Text>
               </TouchableOpacity>
@@ -125,14 +159,23 @@ export const ContractorProfile = () => {
           </View>
 
           <Text style={styles.label}>VERIFICATION STATUS</Text>
-          <View 
-            style={[styles.statusBadge, {
-              backgroundColor: profile?.competence_status === 'Approved' ? COLORS.success :
-                profile?.competence_status === 'Rejected' ? COLORS.secondary : COLORS.warning
-            }]}
-            accessibilityLabel={`Verification status: ${profile?.competence_status || 'Unverified'}`}
+          <View
+            style={[
+              styles.statusBadge,
+              {
+                backgroundColor:
+                  profile?.competence_status === "Approved"
+                    ? COLORS.success
+                    : profile?.competence_status === "Rejected"
+                      ? COLORS.secondary
+                      : COLORS.warning,
+              },
+            ]}
+            accessibilityLabel={`Verification status: ${profile?.competence_status || "Unverified"}`}
           >
-            <Text style={styles.statusText}>{profile?.competence_status?.toUpperCase() || 'UNVERIFIED'}</Text>
+            <Text style={styles.statusText}>
+              {profile?.competence_status?.toUpperCase() || "UNVERIFIED"}
+            </Text>
           </View>
 
           {profile?.rejection_reason && (
@@ -167,9 +210,12 @@ export const ContractorProfile = () => {
           )}
 
           <View style={styles.governanceBox}>
-            <Text style={styles.label} accessibilityRole="header">PRIVACY & DATA RIGHTS</Text>
+            <Text style={styles.label} accessibilityRole="header">
+              PRIVACY & DATA RIGHTS
+            </Text>
             <Text style={styles.infoText}>
-              Your data is stored securely in an encrypted vault. You have the right to export your professional record at any time.
+              Your data is stored securely in an encrypted vault. You have the
+              right to export your professional record at any time.
             </Text>
 
             <TouchableOpacity
@@ -182,7 +228,8 @@ export const ContractorProfile = () => {
             </TouchableOpacity>
 
             <Text style={styles.caption}>
-              To request account deletion or data erasure, please contact the Site Manager.
+              To request account deletion or data erasure, please contact the
+              Site Manager.
             </Text>
           </View>
         </View>
@@ -193,7 +240,7 @@ export const ContractorProfile = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  centerLoader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  centerLoader: { flex: 1, justifyContent: "center", alignItems: "center" },
   scroll: { padding: SPACING.m },
   card: {
     backgroundColor: COLORS.white,
@@ -201,140 +248,140 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     ...SHADOWS.light,
     borderWidth: 1,
-    borderColor: COLORS.lightGray
-  },
-  label: { 
-    ...TYPOGRAPHY.caption, 
-    fontWeight: '800', 
-    color: COLORS.text, 
-    marginBottom: SPACING.s, 
-    letterSpacing: 1.2 
-  },
-  val: { 
-    ...TYPOGRAPHY.header, 
-    color: COLORS.primary, 
-    marginBottom: SPACING.l 
-  },
-  chipRow: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    marginBottom: SPACING.l,
-    gap: 8 
-  },
-  chip: { 
-    paddingHorizontal: 16, 
-    minHeight: 44, 
-    justifyContent: 'center',
-    borderRadius: 22, 
-    borderWidth: 2, 
     borderColor: COLORS.lightGray,
   },
-  chipActive: { 
-    backgroundColor: COLORS.primary, 
-    borderColor: COLORS.primary 
-  },
-  chipText: { 
-    ...TYPOGRAPHY.body, 
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.textLight 
-  },
-  chipTextActive: { 
-    color: COLORS.white, 
-    fontWeight: '800' 
-  },
-  statusBadge: { 
-    alignSelf: 'flex-start', 
-    paddingHorizontal: 12, 
-    paddingVertical: 8, 
-    borderRadius: 8, 
-    marginBottom: SPACING.l 
-  },
-  statusText: { 
-    color: COLORS.white, 
-    fontWeight: '900', 
-    fontSize: 12,
-    letterSpacing: 1 
-  },
-  rejectBox: { 
-    backgroundColor: '#FFF5F5', 
-    padding: SPACING.m, 
-    borderRadius: 8, 
-    marginBottom: SPACING.l, 
-    borderLeftWidth: 6, 
-    borderLeftColor: COLORS.secondary 
-  },
-  rejectTitle: { 
-    ...TYPOGRAPHY.caption, 
-    fontWeight: '900', 
-    color: COLORS.secondary, 
-    marginBottom: 4 
-  },
-  rejectText: { 
-    ...TYPOGRAPHY.body, 
+  label: {
+    ...TYPOGRAPHY.caption,
+    fontWeight: "800",
     color: COLORS.text,
-    lineHeight: 22 
+    marginBottom: SPACING.s,
+    letterSpacing: 1.2,
   },
-  uploadBtn: { 
-    backgroundColor: COLORS.primary, 
-    minHeight: TOUCH_TARGETS.min, 
-    borderRadius: 12, 
-    alignItems: 'center', 
-    justifyContent: 'center' 
+  val: {
+    ...TYPOGRAPHY.header,
+    color: COLORS.primary,
+    marginBottom: SPACING.l,
   },
-  uploadBtnText: { 
-    color: COLORS.white, 
-    fontWeight: '800', 
-    fontSize: 16,
-    letterSpacing: 1 
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: SPACING.l,
+    gap: 8,
   },
-  viewBtn: { 
-    marginTop: SPACING.l, 
-    minHeight: TOUCH_TARGETS.min, 
-    alignItems: 'center', 
-    justifyContent: 'center' 
+  chip: {
+    paddingHorizontal: 16,
+    minHeight: 44,
+    justifyContent: "center",
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: COLORS.lightGray,
   },
-  viewBtnText: { 
-    ...TYPOGRAPHY.body, 
-    color: COLORS.primary, 
-    fontWeight: '800', 
-    textDecorationLine: 'underline' 
+  chipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
-  governanceBox: { 
-    marginTop: SPACING.xl, 
-    padding: SPACING.m, 
-    backgroundColor: COLORS.background, 
-    borderRadius: 12, 
-    borderStyle: 'dashed', 
-    borderWidth: 2, 
-    borderColor: COLORS.gray 
-  },
-  infoText: { 
-    ...TYPOGRAPHY.body, 
+  chipText: {
+    ...TYPOGRAPHY.body,
     fontSize: 14,
-    color: COLORS.textLight, 
-    marginBottom: SPACING.m, 
-    lineHeight: 22 
+    fontWeight: "700",
+    color: COLORS.textLight,
   },
-  exportBtn: { 
-    backgroundColor: COLORS.white, 
-    minHeight: TOUCH_TARGETS.min, 
-    borderRadius: 10, 
-    borderWidth: 2, 
-    borderColor: COLORS.primary, 
-    alignItems: 'center', 
-    justifyContent: 'center' 
+  chipTextActive: {
+    color: COLORS.white,
+    fontWeight: "800",
   },
-  exportBtnText: { 
-    color: COLORS.primary, 
-    fontWeight: '800', 
-    fontSize: 14 
+  statusBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: SPACING.l,
   },
-  caption: { 
-    ...TYPOGRAPHY.caption, 
-    color: COLORS.textLight, 
-    marginTop: SPACING.m, 
-    textAlign: 'center',
-    lineHeight: 16 
-  }
+  statusText: {
+    color: COLORS.white,
+    fontWeight: "900",
+    fontSize: 12,
+    letterSpacing: 1,
+  },
+  rejectBox: {
+    backgroundColor: "#FFF5F5",
+    padding: SPACING.m,
+    borderRadius: 8,
+    marginBottom: SPACING.l,
+    borderLeftWidth: 6,
+    borderLeftColor: COLORS.secondary,
+  },
+  rejectTitle: {
+    ...TYPOGRAPHY.caption,
+    fontWeight: "900",
+    color: COLORS.secondary,
+    marginBottom: 4,
+  },
+  rejectText: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.text,
+    lineHeight: 22,
+  },
+  uploadBtn: {
+    backgroundColor: COLORS.primary,
+    minHeight: TOUCH_TARGETS.min,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  uploadBtnText: {
+    color: COLORS.white,
+    fontWeight: "800",
+    fontSize: 16,
+    letterSpacing: 1,
+  },
+  viewBtn: {
+    marginTop: SPACING.l,
+    minHeight: TOUCH_TARGETS.min,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  viewBtnText: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.primary,
+    fontWeight: "800",
+    textDecorationLine: "underline",
+  },
+  governanceBox: {
+    marginTop: SPACING.xl,
+    padding: SPACING.m,
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    borderStyle: "dashed",
+    borderWidth: 2,
+    borderColor: COLORS.gray,
+  },
+  infoText: {
+    ...TYPOGRAPHY.body,
+    fontSize: 14,
+    color: COLORS.textLight,
+    marginBottom: SPACING.m,
+    lineHeight: 22,
+  },
+  exportBtn: {
+    backgroundColor: COLORS.white,
+    minHeight: TOUCH_TARGETS.min,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  exportBtnText: {
+    color: COLORS.primary,
+    fontWeight: "800",
+    fontSize: 14,
+  },
+  caption: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textLight,
+    marginTop: SPACING.m,
+    textAlign: "center",
+    lineHeight: 16,
+  },
 });

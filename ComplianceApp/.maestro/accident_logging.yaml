@@ -11,17 +11,17 @@ appId: com.blakemedlock.ComplianceApp
 - tapOn: { id: "input-injured-name" }
 - inputText: "John Doe"
 
-- tapOn: { id: "input-accident-location" } 
+- tapOn: { id: "input-accident-location" }
 - inputText: "Loading Bay A"
-- tapOn: { point: "50%, 15%" } 
+- tapOn: { point: "50%, 15%" }
 
 - tapOn: { id: "input-injury-description" }
 - inputText: "Slipped on oily surface."
-- tapOn: { point: "50%, 15%" } 
+- tapOn: { point: "50%, 15%" }
 
 - tapOn: { id: "switch-riddor" }
 
-- tapOn: 
+- tapOn:
     point: "50%, 90%"
 
 - assertVisible: "Entry Sealed"

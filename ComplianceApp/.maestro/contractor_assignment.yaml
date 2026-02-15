@@ -9,7 +9,6 @@ appId: com.blakemedlock.ComplianceApp
 - tapOn: { id: "menu-item-BuildingServices" }
 - tapOn: { id: "btn-assign-asset-0" }
 
-
 - tapOn: { id: "contractor-item-0" }
 
 - assertVisible: "Assigned"

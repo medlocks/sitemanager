@@ -1,10 +1,10 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import NetInfo from '@react-native-community/netinfo';
-import { supabase } from '../lib/supabase';
-import { fileService } from './fileService';
-import { InputValidator } from '../utils/InputValidator';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import NetInfo from "@react-native-community/netinfo";
+import { supabase } from "../lib/supabase";
+import { fileService } from "./fileService";
+import { InputValidator } from "../utils/InputValidator";
 
-const QUEUE_KEY = '@audit_sync_queue';
+const QUEUE_KEY = "@audit_sync_queue";
 
 interface SyncItem {
   id: string;
@@ -17,14 +17,14 @@ export const syncService = {
   async enqueue(table: string, data: any) {
     const cleanTable = InputValidator.sanitize(table);
     const queue = await this.getQueue();
-    
-    const newItem: SyncItem = { 
-      id: Math.random().toString(36).substring(7), 
-      table: cleanTable, 
-      data, 
-      timestamp: new Date().toISOString() 
+
+    const newItem: SyncItem = {
+      id: Math.random().toString(36).substring(7),
+      table: cleanTable,
+      data,
+      timestamp: new Date().toISOString(),
     };
-    
+
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify([...queue, newItem]));
   },
 
@@ -44,44 +44,48 @@ export const syncService = {
 
     for (const item of queue) {
       try {
-        if (item.table === 'storage_uploads') {
-          if (item.data.bucket === 'incident-evidence') {
-            await fileService.uploadIncidentEvidence(item.data.userId, item.data.fileUri, true);
+        if (item.table === "storage_uploads") {
+          if (item.data.bucket === "incident-evidence") {
+            await fileService.uploadIncidentEvidence(
+              item.data.userId,
+              item.data.fileUri,
+              true,
+            );
           } else {
             await fileService.uploadCompetenceDocument(
-              item.data.userId, 
-              item.data.fileUri, 
-              item.data.fileName, 
-              true
+              item.data.userId,
+              item.data.fileUri,
+              item.data.fileName,
+              true,
             );
           }
-        } 
-        
-        else if (item.table === 'work_order_resolutions') {
+        } else if (item.table === "work_order_resolutions") {
           const { taskId, isAssetTask, formData } = item.data;
-          const targetTable = isAssetTask ? 'assets' : 'incidents';
-          const { error } = await supabase.from(targetTable).update(formData).eq('id', taskId);
+          const targetTable = isAssetTask ? "assets" : "incidents";
+          const { error } = await supabase
+            .from(targetTable)
+            .update(formData)
+            .eq("id", taskId);
           if (error) throw error;
-        } 
-        
-        else if (item.table.endsWith('_updates')) {
-          const realTable = item.table.replace('_updates', '');
+        } else if (item.table.endsWith("_updates")) {
+          const realTable = item.table.replace("_updates", "");
           const { id, ...updates } = item.data;
-          const { error } = await supabase.from(realTable).update(updates).eq('id', id);
+          const { error } = await supabase
+            .from(realTable)
+            .update(updates)
+            .eq("id", id);
           if (error) throw error;
-        }
-
-        else if (item.table.endsWith('_deletions')) {
-          const realTable = item.table.replace('_deletions', '');
-          const { error } = await supabase.from(realTable).delete().eq('id', item.data.id);
+        } else if (item.table.endsWith("_deletions")) {
+          const realTable = item.table.replace("_deletions", "");
+          const { error } = await supabase
+            .from(realTable)
+            .delete()
+            .eq("id", item.data.id);
           if (error) throw error;
-        }
-
-        else {
+        } else {
           const { error } = await supabase.from(item.table).insert([item.data]);
           if (error) throw error;
         }
-
       } catch (e) {
         failedIds.push(item.id);
       }
@@ -89,5 +93,5 @@ export const syncService = {
 
     const finalQueue = queue.filter((i: SyncItem) => failedIds.includes(i.id));
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(finalQueue));
-  }
+  },
 };

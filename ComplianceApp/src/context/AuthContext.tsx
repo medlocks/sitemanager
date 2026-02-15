@@ -1,12 +1,12 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { Alert } from 'react-native';
-import { supabase } from '../lib/supabase';
-import { authService } from '../services/authService';
+import React, { createContext, useState, useContext, useEffect } from "react";
+import { Alert } from "react-native";
+import { supabase } from "../lib/supabase";
+import { authService } from "../services/authService";
 
 interface User {
   id: string;
   email: string;
-  role: 'Manager' | 'Employee' | 'Contractor';
+  role: "Manager" | "Employee" | "Contractor";
   name: string;
 }
 
@@ -19,7 +19,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -30,7 +32,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(profile);
       } else {
         setUser(null);
-        Alert.alert("Profile Error", "Account verified, but profile record not found.");
+        Alert.alert(
+          "Profile Error",
+          "Account verified, but profile record not found.",
+        );
       }
     } catch (error: any) {
       console.error("Profile Sync Error:", error.message);
@@ -41,7 +46,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (session) {
           await syncProfile(session.user.id);
         }
@@ -54,14 +61,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initializeAuth();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session) {
-        await syncProfile(session.user.id);
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (session) {
+          await syncProfile(session.user.id);
+        } else {
+          setUser(null);
+        }
+        setLoading(false);
+      },
+    );
 
     return () => {
       authListener.subscription.unsubscribe();

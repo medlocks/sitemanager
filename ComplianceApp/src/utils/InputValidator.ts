@@ -33,17 +33,17 @@ export const InputValidator = {
 
   validateAsset: (name: string, nextDueDate: string) => {
     const errors: string[] = [];
-    
+
     if (!name || name.length < 2) errors.push("Asset name is too short.");
 
     const selectedDate = new Date(nextDueDate);
     const today = new Date();
-    today.setHours(0, 0, 0, 0); 
+    today.setHours(0, 0, 0, 0);
 
     if (selectedDate < today) {
       errors.push("Next Due Date cannot be in the past.");
     }
 
     return { isValid: errors.length === 0, errors };
-  }
+  },
 };

@@ -12,7 +12,6 @@ appId: com.blakemedlock.ComplianceApp
     visible: { id: "sign-off-modal" }
     timeout: 10000
 
-
 - tapOn: { id: "input-resolution-notes" }
 - inputText: "Completed emergency light testing. Replaced 2 faulty batteries."
 
@@ -27,7 +26,6 @@ appId: com.blakemedlock.ComplianceApp
 - tapOn: "OK"
 
 - tapOn: { id: "btn-seal-record" }
-
 
 - extendedWaitUntil:
     visible: "Regulatory record sealed."

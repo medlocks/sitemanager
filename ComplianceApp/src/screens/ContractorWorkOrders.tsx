@@ -1,12 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Alert, SafeAreaView, View, ActivityIndicator } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-import { workOrderService } from '../services/workOrderService';
-import { COLORS } from '../theme';
+import React, { useState, useEffect } from "react";
+import {
+  StyleSheet,
+  Alert,
+  SafeAreaView,
+  View,
+  ActivityIndicator,
+} from "react-native";
+import { useAuth } from "../context/AuthContext";
+import { workOrderService } from "../services/workOrderService";
+import { COLORS } from "../theme";
 
-import { QuickActions } from '../components/contractor/QuickActions';
-import { WorkOrderList } from '../components/contractor/WorkOrderList';
-import { SignOffModal } from '../components/contractor/SignOffModal';
+import { QuickActions } from "../components/contractor/QuickActions";
+import { WorkOrderList } from "../components/contractor/WorkOrderList";
+import { SignOffModal } from "../components/contractor/SignOffModal";
 
 export const ContractorWorkOrders = ({ navigation }: any) => {
   const { user } = useAuth();
@@ -29,7 +35,7 @@ export const ContractorWorkOrders = ({ navigation }: any) => {
   };
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', loadTasks);
+    const unsubscribe = navigation.addListener("focus", loadTasks);
     return unsubscribe;
   }, [navigation, user]);
 
@@ -50,20 +56,17 @@ export const ContractorWorkOrders = ({ navigation }: any) => {
 
       {loading ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator 
-            size="large" 
-            color={COLORS.primary} 
-            accessibilityLabel="Loading work orders" 
+          <ActivityIndicator
+            size="large"
+            color={COLORS.primary}
+            accessibilityLabel="Loading work orders"
           />
         </View>
       ) : (
-        <WorkOrderList 
-          tasks={assignedTasks} 
-          onSignOff={handleSignOffPress} 
-        />
+        <WorkOrderList tasks={assignedTasks} onSignOff={handleSignOffPress} />
       )}
 
-      <SignOffModal 
+      <SignOffModal
         visible={modalVisible}
         task={selectedTask}
         onClose={() => setModalVisible(false)}
@@ -74,13 +77,13 @@ export const ContractorWorkOrders = ({ navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: COLORS.background 
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
   loaderContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  }
+    justifyContent: "center",
+    alignItems: "center",
+  },
 });
