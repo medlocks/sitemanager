@@ -53,19 +53,6 @@ export const auditService = {
     };
   },
 
-  getTradeDistribution(incidents: any[]) {
-    const counts: Record<TradeKey, number> = { 'Elec': 0, 'Plumb': 0, 'Fire': 0, 'Gas': 0, 'Other': 0 };
-    incidents.forEach(item => {
-      const spec = (item.profiles?.specialism || '').toLowerCase();
-      if (spec.includes('elec')) counts['Elec']++;
-      else if (spec.includes('plumb')) counts['Plumb']++;
-      else if (spec.includes('fire')) counts['Fire']++;
-      else if (spec.includes('gas')) counts['Gas']++;
-      else counts['Other']++;
-    });
-    return counts;
-  },
-
   async generateAuditPDF(title: string, data: any[], isAsset: boolean) {
   const cleanTitle = InputValidator.sanitize(title);
 

@@ -3,6 +3,8 @@ appId: com.blakemedlock.ComplianceApp
 - runFlow: fault_reporting.yaml
 - runFlow: accident_logging.yaml
 - runFlow: manager_audit.yaml
+- runFlow: notifications.yaml
 - runFlow: asset_creation_deletion.yaml
+- runFlow: contractor_vetting.yaml
 - runFlow: contractor_assignment.yaml
 - runFlow: contractor_signoff.yaml

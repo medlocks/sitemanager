@@ -13,7 +13,7 @@ import {
 import { contractorService, Contractor } from '../services/contractorService';
 import { COLORS, TYPOGRAPHY, SHADOWS, SPACING, TOUCH_TARGETS } from '../theme';
 
-export const QualificationTracker = ({ navigation }: any) => {
+export const ContractorVerification = ({ navigation }: any) => {
   const [allContractors, setAllContractors] = useState<Contractor[]>([]);
   const [filteredSections, setFilteredSections] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -42,15 +42,15 @@ export const QualificationTracker = ({ navigation }: any) => {
 
     const sections = [
       { 
-        title: '🟠 Awaiting Verification', 
+        title: 'Awaiting Verification', 
         data: filtered.filter(c => c.competence_status === 'Pending' && c.competence_evidence_url) 
       },
       { 
-        title: '🟢 Approved Specialists', 
+        title: 'Approved Specialists', 
         data: filtered.filter(c => c.competence_status === 'Approved') 
       },
       { 
-        title: '⚪ Suspended / Others', 
+        title: 'Suspended / Others', 
         data: filtered.filter(c => c.competence_status !== 'Approved' && c.competence_status !== 'Pending') 
       }
     ];
@@ -69,7 +69,7 @@ export const QualificationTracker = ({ navigation }: any) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.mainTitle} accessibilityRole="header">Workforce Governance</Text>
+        <Text style={styles.mainTitle} accessibilityRole="header">Specialist Verification</Text>
         <TextInput 
           style={styles.searchBar} 
           placeholder="Search by name, trade, or company..." 
@@ -77,7 +77,7 @@ export const QualificationTracker = ({ navigation }: any) => {
           value={searchQuery}
           onChangeText={setSearchQuery}
           editable={!loading}
-          accessibilityLabel="Search workforce"
+          accessibilityLabel="Search contractors"
           accessibilityHint="Filters contractors by name, trade, or company"
         />
       </View>

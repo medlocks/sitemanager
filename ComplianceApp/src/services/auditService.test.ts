@@ -43,20 +43,6 @@ describe('AuditService', () => {
     expect(trend.values[trend.labels.indexOf('Feb')]).toBe(1);
   });
 
-  it('should distribute trade specialisms correctly', () => {
-    const mockIncidents = [
-      { profiles: { specialism: 'Electrician' } },
-      { profiles: { specialism: 'Plumbing' } },
-      { profiles: { specialism: 'General' } }
-    ];
-
-    const distribution = auditService.getTradeDistribution(mockIncidents);
-
-    expect(distribution.Elec).toBe(1);
-    expect(distribution.Plumb).toBe(1);
-    expect(distribution.Other).toBe(1);
-  });
-
   it('should trigger expo-print and sharing for PDF generation', async () => {
     const mockData = [{ description: 'Test', status: 'Pending', created_at: '2026-01-01' }];
     

@@ -109,7 +109,7 @@ export const assetService = {
   },
 
   async duplicateAsset(item: any) {
-    const rawName = `${item.assetName} (Copy)`;
+    const rawName = `${item.asset_name} (Copy)`; 
     const cleanName = InputValidator.sanitize(rawName);
 
     const dataToInsert = {
@@ -119,7 +119,6 @@ export const assetService = {
       location: item.location,
       status: 'Non-Compliant',
       next_service_due: new Date().toISOString().split('T')[0],
-      min_clearance_required: item.minClearance
     };
 
     const state = await NetInfo.fetch();
@@ -133,8 +132,9 @@ export const assetService = {
       .insert([dataToInsert]);
 
     if (error) {
+      console.error("Duplicate Error:", error);
       return { success: false, error: 'Duplication failed.' };
     }
     return { success: true, offline: false };
-  }
+}
 };

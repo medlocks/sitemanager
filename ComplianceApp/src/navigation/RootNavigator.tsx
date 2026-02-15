@@ -21,7 +21,7 @@ import { EmployeeDashboard } from '../screens/EmployeeDashboard';
 
 import { FaultReporting } from '../screens/FaultReporting';
 import { BuildingServices } from '../screens/BuildingServices';
-import { QualificationTracker } from '../screens/QualificationTracker';
+import { ContractorVerification } from '../screens/ContractorVerification';
 import { AuditReport } from '../screens/AuditReport';
 import { LogAccident } from '../screens/LogAccident';
 import { NotificationsScreen } from '../screens/NotificationScreen';
@@ -141,6 +141,7 @@ export const RootNavigator = () => {
                   headerLeft: () => (
                     user.role === 'Manager' ? (
                       <TouchableOpacity 
+                        testID='notifications-btn'
                         onPress={() => navigation.navigate('Notifications')} 
                         style={styles.headerLeftBtn}
                         accessibilityRole="button"
@@ -158,7 +159,7 @@ export const RootNavigator = () => {
               <Stack.Screen name="LogAccident" component={LogAccident} options={{ title: 'LOG ACCIDENT' }} />
 
               <Stack.Screen name="BuildingServices" component={BuildingServices} options={{ title: 'ASSET MANAGEMENT' }} />
-              <Stack.Screen name="QualificationTracker" component={QualificationTracker} options={{ title: 'COMPLIANCE' }} />
+              <Stack.Screen name="ContractorVerification" component={ContractorVerification} options={{ title: 'COMPLIANCE' }} />
               <Stack.Screen name="AuditReport" component={AuditReport} options={{ title: 'AUDIT EVIDENCE' }} />
               <Stack.Screen name="AddAsset" component={AddAsset} options={{ title: 'ADD NEW ASSET' }} />
               <Stack.Screen name="IncidentDetail" component={IncidentDetail} options={{ title: 'INCIDENT DOSSIER' }} />

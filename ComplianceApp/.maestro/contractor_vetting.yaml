@@ -2,14 +2,16 @@ appId: com.blakemedlock.ComplianceApp
 ---
 - launchApp: { clearState: true }
 
-- inputText: { id: "login-email-input", text: "manager@raytheon.com" }
-- inputText: { id: "login-password-input", text: "pass123" }
-- tapOn: { id: "login-submit-btn" }
+- runFlow:
+    file: subflow_login.yaml
+    env:
+      USER_EMAIL: "manager@test.co.uk"
+      USER_PASS: "password"
 
-- tapOn: { id: "menu-item-QualificationTracker" }
+- tapOn: "Specialist Verification"
 - assertVisible: "Specialist Verification"
 
-- tapOn: { id: "audit-log-item-0" } 
+- tapOn: "Dave Sparks"
 - assertVisible: "CONTRACTOR DOSSIER"
 
 - assertVisible: { id: "btn-view-contractor-cert" }

@@ -55,12 +55,6 @@ export const LogAccident = ({ navigation }: any) => {
         throw new Error(result.error || "Submission failed");
       }
 
-      await notificationService.notifyManagers(
-        "CRITICAL: ACCIDENT LOGGED",
-        `Statutory entry for ${form.injured_person_name} at ${form.location} logged by ${user.name || 'User'}`,
-        "ACCIDENT"
-      );
-
       Alert.alert(
         "Entry Sealed", 
         "Accident logged in the statutory book. Site management has been alerted.",

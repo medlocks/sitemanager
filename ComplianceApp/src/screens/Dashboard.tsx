@@ -20,7 +20,7 @@ export const Dashboard = ({ navigation }: Props) => {
     { id: '2', title: 'Log Statutory Accident', icon: 'medical-outline', screen: 'LogAccident' },
     { id: '3', title: 'Building Assets', icon: 'construct-outline', screen: 'BuildingServices' },
     { id: '4', title: 'Audit Evidence', icon: 'shield-checkmark-outline', screen: 'AuditReport' },
-    { id: '5', title: 'Specialist Verification', icon: 'people-outline', screen: 'QualificationTracker' },
+    { id: '5', title: 'Specialist Verification', icon: 'people-outline', screen: 'ContractorVerification' },
   ];
 
   const fetchData = async () => {

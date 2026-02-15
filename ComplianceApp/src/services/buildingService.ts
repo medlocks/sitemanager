@@ -9,7 +9,6 @@ export interface ServiceReport {
   status: string;
   lastServiceDate: string | null;
   nextServiceDueDate: string | null;
-  minClearance: string | number | null;
 }
 
 export const buildingService = {
@@ -29,8 +28,7 @@ export const buildingService = {
       location: item.location,
       status: item.status,
       lastServiceDate: item.last_service,
-      nextServiceDueDate: item.next_service_due,
-      minClearance: item.min_clearance_required
+      nextServiceDueDate: item.next_service_due
     }));
   }
 };
